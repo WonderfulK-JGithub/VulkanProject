@@ -1,0 +1,11 @@
+{
+  "id": 1,
+  "myFragmentShaderName": "shader.frag",
+  "myMaterialType": 1,
+  "myRenderStage": 1,
+  "myTextureIds": [
+    219902325555200
+  ],
+  "myVertexShaderName": "shader.vert",
+  "name": "C:\\Users\\pizza\\Desktop\\VulkanKJ\\Assets\\data\\New_Material"
+}
