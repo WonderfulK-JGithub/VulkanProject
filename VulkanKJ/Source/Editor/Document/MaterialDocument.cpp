@@ -142,8 +142,6 @@ void Wonder::MaterialDocument::DisplayProperties()
 
     for (auto& pushConstant : AccessEditMaterial().AccessPushConstants())
     {
-        ImGui::TextUnformatted(pushConstant.name.c_str());
-        ImGui::SameLine();
         switch (pushConstant.info.type)
         {
             case ShaderReflection::PushConstantType::Padding:
@@ -159,35 +157,36 @@ void Wonder::MaterialDocument::DisplayProperties()
             case ShaderReflection::PushConstantType::TextureIndex:
             {
                 TextureId textureId = *reinterpret_cast<TextureId*>(pushConstant.info.data.data());
-                info |= ImGuiUtil::DisplayTextureReferenceEdit(textureId);
+                DISPLAY_WITH_COPY(info,pushConstant.name.c_str(),textureId,ImGuiUtil::DisplayTextureReferenceEdit(textureId));
                 std::copy_n(reinterpret_cast<char*>(&textureId),sizeof(textureId),pushConstant.info.data.data());
             }
                 break;
             case ShaderReflection::PushConstantType::Float:
             {
                 float floatValue = *reinterpret_cast<float*>(pushConstant.info.data.data());
-                info |= ImGuiUtil::DisplayDragFloat("#floatValue",&floatValue);
+                DISPLAY_WITH_COPY(info,pushConstant.name.c_str(),floatValue,ImGuiUtil::DisplayDragFloat("#floatValue",&floatValue));
                 std::copy_n(reinterpret_cast<char*>(&floatValue),sizeof(floatValue),pushConstant.info.data.data());
             }
                 break;
             case ShaderReflection::PushConstantType::Vector2:
             {
                 glm::vec2 vector2Value = *reinterpret_cast<glm::vec2*>(pushConstant.info.data.data());
-                info |= ImGuiUtil::DisplayDragFloat2("#vector2Value",&vector2Value.x);
+                DISPLAY_WITH_COPY(info,pushConstant.name.c_str(),vector2Value,ImGuiUtil::DisplayDragFloat2("#vector2Value",&vector2Value.x));
                 std::copy_n(reinterpret_cast<char*>(&vector2Value),sizeof(vector2Value),pushConstant.info.data.data());
             }
                 break;
             case ShaderReflection::PushConstantType::Vector3:
             {
                 glm::vec3 vector3Value = *reinterpret_cast<glm::vec3*>(pushConstant.info.data.data());
-                info |= ImGuiUtil::DisplayDragFloat3("#vector3Value",&vector3Value.x);
+                DISPLAY_WITH_COPY(info,pushConstant.name.c_str(),vector3Value,ImGuiUtil::DisplayDragFloat3("#vector3Value",&vector3Value.x));
                 std::copy_n(reinterpret_cast<char*>(&vector3Value),sizeof(vector3Value),pushConstant.info.data.data());
             }
                 break;
             case ShaderReflection::PushConstantType::Color:
             {
                 glm::vec4 colorValue = *reinterpret_cast<glm::vec4*>(pushConstant.info.data.data());
-                info |= ImGuiUtil::DisplayColor4("#colorValue",&colorValue.r,ImGuiColorEditFlags_NoInputs);
+                DISPLAY_WITH_COPY(info,pushConstant.name.c_str(),colorValue,
+                    ImGuiUtil::DisplayColor4("#colorValue",&colorValue.r,ImGuiColorEditFlags_NoInputs));
                 std::copy_n(reinterpret_cast<char*>(&colorValue),sizeof(colorValue),pushConstant.info.data.data());
             }
                 break;

@@ -8,6 +8,8 @@
 #include <imgui/imgui.h>
 #include <magic_enum/magic_enum.hpp>
 
+#include "Clipboard/Clipboard.h"
+#include "Clipboard/VariableCopyItem.h"
 #include "Container/FixedString.h"
 
 namespace KeyboardInput
@@ -164,7 +166,43 @@ namespace Wonder::ImGuiUtil
 	void ThickSeparator(float aThickness,ImU32 aColor = IM_COL32(100, 100, 100,255));
 
 	bool DisplayWorldSpaceHoverCircle(glm::vec3 aWorldPos,float aRadius,const glm::mat4x4& aWorldToProjection,glm::ivec2 aViewportPos, glm::vec2 aViewportSize);
-
+	
+	template<typename T>
+	uint8_t DisplayCopyPopup(T& aData)
+	{
+		using namespace Wonder::Clipboard;
+	
+		uint8_t info = 0;
+	
+		if (ImGui::BeginPopupContextItem("abc"))
+		{
+			if (ImGui::Button("Copy"))
+			{
+				Wonder::Clipboard::Store(std::make_shared<VariableCopyItem<T>>(aData));
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::BeginDisabled(Wonder::Clipboard::HasItem<VariableCopyItem<T>>() == false);
+			if (ImGui::Button("Paste"))
+			{
+				aData = *reinterpret_cast<const T*>(GetItem()->GetData());
+				info = Wonder::InfoFlag_ChangedValue | Wonder::InfoFlag_EditEnded;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndDisabled();
+		
+			ImGui::EndPopup();
+		}
+	
+		return info;
+	}
+	
+#define DISPLAY_WITH_COPY(INFO,NAME,VALUE,FUNCTION) ImGui::TextUnformatted(NAME);\
+	ImGui::PushID(&VALUE);\
+	ImGui::SameLine();\
+	ImGuiUtil::DisplayCopyPopup(VALUE);\
+	info |= (FUNCTION);\
+	ImGui::PopID();
+	
 	namespace PropertyTable
 	{
 		bool PropertyHeader(const char* aHeaderName);

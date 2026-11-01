@@ -20,6 +20,7 @@
 #include "spdlog/sinks/callback_sink.h"
 
 #include "imgui.h"
+#include "Util/DebugUtilities.h"
 
 namespace Goose::Logging
 {
@@ -253,26 +254,12 @@ namespace Goose::Logging
 
         void DisplayStats()
         {
-            // static std::array<std::chrono::nanoseconds, 100> savedDeltaTime;
-            // static uint32_t saveIndex = 0;
-            //
-            // std::chrono::nanoseconds currentTime = std::chrono::high_resolution_clock::now().time_since_epoch();
-            // savedDeltaTime[saveIndex] = currentTime;
-            //
-            // std::chrono::nanoseconds oldTimestamp = savedDeltaTime[(saveIndex == savedDeltaTime.size() - 1) ? (0) : (saveIndex + 1)];
-            // const double delta = std::chrono::duration<double>(currentTime - oldTimestamp).count() /  savedDeltaTime.size();
-            //
-            // saveIndex++; 
-            // if (saveIndex >= savedDeltaTime.size())
-            // {
-            //     saveIndex = 0;
-            // }
-
-            ImGui::Text("Delta time: %fms", Engine::GetInstance().GetDeltaTime() * 1000.f);
-            ImGui::Text("FPS: %d", static_cast<int>(1.f / Engine::GetInstance().GetDeltaTime()));
-            //ImGui::Text("Draw calls: %i", Tga::DX11::GetPreviousDrawCallCount());
-
-            //RenderSystem::ShowImGui();
+            if (DebugUtilities::BeginDebugTabItem("Stats"))
+            {
+                ImGui::Text("Delta time: %fms", Engine::GetInstance().GetDeltaTime() * 1000.f);
+                ImGui::Text("FPS: %d", static_cast<int>(1.f / Engine::GetInstance().GetDeltaTime()));
+            }
+            DebugUtilities::EndDebugTabItem();
         }
 
         void Terminate()
