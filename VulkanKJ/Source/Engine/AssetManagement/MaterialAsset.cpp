@@ -149,8 +149,8 @@ void Wonder::MaterialAsset::CopyFromOther(const MaterialAsset& aOther)
     myVertexShaderName = aOther.myVertexShaderName;
     myFragmentShaderName = aOther.myFragmentShaderName;
     myPushConstants = aOther.myPushConstants;
-    myRenderStage = aOther.myRenderStage;
     myMaterialType = aOther.myMaterialType;
+    SetRenderStage(aOther.myRenderStage);
 }
 
 void Wonder::MaterialAsset::AdjustPushConstantsToReflection()

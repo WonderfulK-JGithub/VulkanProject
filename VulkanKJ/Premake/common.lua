@@ -43,7 +43,7 @@ engine_settings = os.realpath(dirs.settings .. "/EngineSettings.json")
 function default_settings()
 	return {
 		assets_path = {
-			bin = dirs.bin;
+			bin = path.getrelative(dirs.bin, dirs.bin) .. "/",
 			engine_assets = path.getrelative(dirs.bin, dirs.engine_assets) .. "/",
 			data = path.getrelative(dirs.bin, dirs.data) .. "/",
 			cooked = path.getrelative(dirs.bin, dirs.cooked_assets) .. "/",

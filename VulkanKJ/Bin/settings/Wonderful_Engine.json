@@ -1,1 +1,39 @@
-{"assets_path":{"assets":"../Assets/","baked":"BakedAssets/","bin":"C:\\Users\\pizza\\Desktop\\VulkanKJ\\Bin\\","cooked":"CookedAssets/","cutsceneData":"../Assets/levelData/cutsceneData/","data":"../Assets/data/","engine_assets":"../Assets/Engine/","intermediateAssets":"../Assets/intermediateAssets/","levelData":"CookedAssets/","source":"../Source/"},"enable_vsync":false,"window_settings":{"aspect_ratio":1.7,"clear_color":{"a":1.0,"b":0.25,"g":0.2,"r":0.0},"keep_aspect_ratio":true,"render_size":{"h":900,"w":1600},"start_in_fullscreen":false,"target_size":{"h":900,"w":1600},"title":"Wonderful Engine","window_size":{"h":900,"w":1600}}}
+{
+    "assets_path": {
+        "assets": "../Assets/",
+        "baked": "BakedAssets/",
+        "bin": "./",
+        "cooked": "CookedAssets/",
+        "cutsceneData": "../Assets/levelData/cutsceneData/",
+        "data": "../Assets/data/",
+        "engine_assets": "../Assets/Engine/",
+        "intermediateAssets": "../Assets/intermediateAssets/",
+        "levelData": "CookedAssets/",
+        "source": "../Source/"
+    },
+    "enable_vsync": false,
+    "window_settings": {
+        "aspect_ratio": 1.7,
+        "clear_color": {
+            "a": 1.0,
+            "b": 0.25,
+            "g": 0.2,
+            "r": 0.0
+        },
+        "keep_aspect_ratio": true,
+        "render_size": {
+            "h": 900,
+            "w": 1600
+        },
+        "start_in_fullscreen": false,
+        "target_size": {
+            "h": 900,
+            "w": 1600
+        },
+        "title": "Wonderful Engine",
+        "window_size": {
+            "h": 900,
+            "w": 1600
+        }
+    }
+}

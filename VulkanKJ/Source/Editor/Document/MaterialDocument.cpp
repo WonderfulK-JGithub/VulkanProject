@@ -17,7 +17,10 @@ void Wonder::MaterialDocument::Init(const Filepath& aFilePath)
     myImGuiName = Tga::StringRegistry::RegisterOrGetString(fileName);
     
     mySavedMaterialId = GetMaterialRegistry().GetIDFromName(fileName.c_str());
-    myEditMaterialId = GetMaterialRegistry().RegisterAssetCopy(GetMaterialRegistry().AccessAssetFromID(mySavedMaterialId));
+    myReferenceMaterial.CopyFromOther(GetMaterialRegistry().AccessAssetFromID(mySavedMaterialId));
+    myEditMaterialId = GetMaterialRegistry().RegisterAssetCopy(myReferenceMaterial);
+    
+    AccessEditMaterial().Build();
     
     myPanelNames.resize(static_cast<uint32_t>(PanelNames::Count));
     myPanelInfos.resize(myPanelNames.size());
