@@ -18,6 +18,7 @@ namespace Wonder
         void Load();
         void Unload();
         bool IsLoaded() const;
+        bool IsCubemap() const;
         
         VkDescriptorSet& GetImGuiDescriptorSet();
     private:

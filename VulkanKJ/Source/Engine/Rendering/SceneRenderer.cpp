@@ -9,7 +9,8 @@
 
 namespace SceneRenderer
 {
-    static vk::DescriptorPool localBufferDescriptorPool;
+    static vk::DescriptorPool localGlobalDescriptorPool;
+	static vk::DescriptorPool localModelInstanceDescriptorPool;
 }
 
 void SceneRenderer::CreateSceneImageInfo(SceneImageInfo& aInfoOut,RenderImage& aFinalRenderImage, const vk::Extent2D aSize)
@@ -32,18 +33,19 @@ void SceneRenderer::CreateSceneImageInfo(SceneImageInfo& aInfoOut,RenderImage& a
 
 void SceneRenderer::CreateSceneObjectInfo(SceneObjectInfo& aInfoOut)
 {
-	aInfoOut.cameraMatrixBuffer.Init(sizeof(VkInit::CameraMatrices),vk::BufferUsageFlagBits::eUniformBuffer);
-	aInfoOut.cameraVectorBuffer.Init(sizeof(VkInit::CameraVectors),vk::BufferUsageFlagBits::eUniformBuffer);
+	aInfoOut.cameraDataBuffer.Init(sizeof(VkInit::CameraData),vk::BufferUsageFlagBits::eUniformBuffer);
 	aInfoOut.instanceBuffer.Init(sizeof(VkInit::ModelInstance) * 1024,vk::BufferUsageFlagBits::eStorageBuffer);
 	aInfoOut.lineVertexBuffer.Init(sizeof(Vulkan::LineVertex) * MAX_LINE_COUNT * 2,vk::BufferUsageFlagBits::eVertexBuffer);
 	
-	aInfoOut.cubemapDescriptorSet.Init(localBufferDescriptorPool,VkInit::GetStageDescriptorSetLayout(Vulkan::RenderStageType::Cubemap));
-	aInfoOut.forwardDescriptorSet.Init(localBufferDescriptorPool,VkInit::GetStageDescriptorSetLayout(Vulkan::RenderStageType::Forward));
+	aInfoOut.descriptorSetCollection.globalDescriptorSet.Init(localGlobalDescriptorPool,
+		VkInit::GetDescriptorSetLayout(VkInit::DescriptorLayoutType::Camera));
+	aInfoOut.descriptorSetCollection.modelInstanceDescriptorSet.Init(localModelInstanceDescriptorPool,
+		VkInit::GetDescriptorSetLayout(VkInit::DescriptorLayoutType::ModelInstance));
 	
-	aInfoOut.descriptorWriter.AddDescriptorInfo(aInfoOut.cubemapDescriptorSet,aInfoOut.cameraVectorBuffer,vk::DescriptorType::eUniformBuffer,0);
-	
-	aInfoOut.descriptorWriter.AddDescriptorInfo(aInfoOut.forwardDescriptorSet,aInfoOut.cameraMatrixBuffer,vk::DescriptorType::eUniformBuffer,0);
-	aInfoOut.descriptorWriter.AddDescriptorInfo(aInfoOut.forwardDescriptorSet,aInfoOut.instanceBuffer,vk::DescriptorType::eStorageBuffer,1);
+	aInfoOut.descriptorWriter.AddDescriptorInfo(aInfoOut.descriptorSetCollection.globalDescriptorSet,aInfoOut.cameraDataBuffer,
+		vk::DescriptorType::eUniformBuffer,0);
+	aInfoOut.descriptorWriter.AddDescriptorInfo(aInfoOut.descriptorSetCollection.modelInstanceDescriptorSet,aInfoOut.instanceBuffer,
+		vk::DescriptorType::eStorageBuffer,0);
 }
 
 void SceneRenderer::DestroySceneImageInfo(SceneImageInfo& aInfoOut)
@@ -60,8 +62,7 @@ void SceneRenderer::DestroySceneObjectInfo(SceneObjectInfo& aInfoOut)
 {
 	aInfoOut.descriptorWriter.Reset();
 	
-	aInfoOut.cameraMatrixBuffer.Destroy();
-	aInfoOut.cameraVectorBuffer.Destroy();
+	aInfoOut.cameraDataBuffer.Destroy();
 	aInfoOut.instanceBuffer.Destroy();
 	aInfoOut.lineVertexBuffer.Destroy();
 }
@@ -70,16 +71,25 @@ void SceneRenderer::Init()
 {
 	Engine& engine = Engine::GetInstance();
 	
-    VkInit::DescriptorSetLayoutData input;
-    input.count = 2;
-    input.types.push_back(vk::DescriptorType::eUniformBuffer);
-    input.types.push_back(vk::DescriptorType::eStorageBuffer);
-    localBufferDescriptorPool = VkInit::MakeDescriptorPool(engine.GetLogicalDevice(), 1000, input);
+	{
+		VkInit::DescriptorSetLayoutData input;
+		input.count = 1;
+		input.types.push_back(vk::DescriptorType::eUniformBuffer);
+		localGlobalDescriptorPool = VkInit::MakeDescriptorPool(engine.GetLogicalDevice(), 100, input);
+	}
+	
+	{
+		VkInit::DescriptorSetLayoutData input;
+		input.count = 1;
+		input.types.push_back(vk::DescriptorType::eStorageBuffer);
+		localModelInstanceDescriptorPool = VkInit::MakeDescriptorPool(engine.GetLogicalDevice(), 100, input);
+	}
 }
 
 void SceneRenderer::Destroy()
 {
-	Engine::GetInstance().GetLogicalDevice().destroyDescriptorPool(localBufferDescriptorPool);
+	Engine::GetInstance().GetLogicalDevice().destroyDescriptorPool(localGlobalDescriptorPool);
+	Engine::GetInstance().GetLogicalDevice().destroyDescriptorPool(localModelInstanceDescriptorPool);
 }
 
 void SceneRenderer::Render(vk::CommandBuffer aCommandBuffer,SceneImageInfo& aImageInfo, const SceneObjectInfo& aObjectInfo)
@@ -93,11 +103,7 @@ void SceneRenderer::Render(vk::CommandBuffer aCommandBuffer,SceneImageInfo& aIma
 void SceneRenderer::Internal::Prepare(vk::CommandBuffer aCommandBuffer,const SceneObjectInfo& aObjectInfo)
 {
 	{
-		memcpy(aObjectInfo.cameraMatrixBuffer.GetWriteLocation(), &aObjectInfo.cameraMatrixData, sizeof(aObjectInfo.cameraMatrixData));
-	}
-
-	{
-		memcpy(aObjectInfo.cameraVectorBuffer.GetWriteLocation(), &aObjectInfo.cameraVectorData, sizeof(aObjectInfo.cameraVectorData));
+		memcpy(aObjectInfo.cameraDataBuffer.GetWriteLocation(), &aObjectInfo.cameraData, sizeof(aObjectInfo.cameraData));
 	}
 	
 	memcpy(aObjectInfo.lineVertexBuffer.GetWriteLocation(), aObjectInfo.linePoints.data(), sizeof(Vulkan::LineVertex) * aObjectInfo.linePoints.size());
@@ -112,10 +118,15 @@ void SceneRenderer::Internal::Prepare(vk::CommandBuffer aCommandBuffer,const Sce
 	for (uint32_t i = 0; i < instanceMap.size(); ++i)
 	{
 		const size_t batchSize = instanceMap.data()[i].size();
-		void* dst = static_cast<char*>(aObjectInfo.instanceBuffer.GetWriteLocation()) + startInstance * sizeof(VkInit::ModelInstance);
-		memcpy(dst, instanceMap.data()[i].data(), 
-			batchSize * sizeof(VkInit::ModelInstance));
-		startInstance += batchSize;
+		
+		if (batchSize > 0)
+		{
+			void* dst = static_cast<char*>(aObjectInfo.instanceBuffer.GetWriteLocation()) + startInstance * sizeof(VkInit::ModelInstance);
+			memcpy(dst, instanceMap.data()[i].data(), 
+				batchSize * sizeof(VkInit::ModelInstance));
+			startInstance += batchSize;
+		}
+		
 	}
 	
 	aObjectInfo.descriptorWriter.UpdateDescriptorSets();
@@ -130,13 +141,9 @@ void SceneRenderer::Internal::RenderCubemap(const vk::CommandBuffer aCommandBuff
 	
 	Wonder::MaterialAsset& cubemapMaterial = Wonder::GetMaterialRegistry().AccessAssetFromID(aObjectInfo.cubemapMaterial);
 	
-	aCommandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, cubemapMaterial.GetPipelineLayout(), 0,
-		aObjectInfo.cubemapDescriptorSet.GetDescriptorSet(), {});
-	aCommandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, cubemapMaterial.GetPipelineLayout(), 1, 
-		Vulkan::TextureDescriptor::GetInstance().GetDescriptorSet(),{});
+	Vulkan::BindPipelineLayout(aCommandBuffer,aObjectInfo.descriptorSetCollection,Vulkan::PipelineLayoutType::DefaultPipeline);
 
 	cubemapMaterial.Bind(aCommandBuffer,aImageInfo.resolutionId);
-	// myCubemap.Use(aCommandBuffer, myPipelineLayouts[VkInit::PipelineType::Cubemap]);
 	aCommandBuffer.draw(6, 1, 0, 0);
 
 	aCommandBuffer.endRenderPass();
@@ -151,10 +158,7 @@ void SceneRenderer::Internal::RenderForward(vk::CommandBuffer aCommandBuffer, Sc
 
 	auto& instanceMap = aObjectInfo.instances.GetInstances();
 	
-	aCommandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, Vulkan::GetPipelineLayout(Vulkan::RenderStageType::Forward), 0, 
-		aObjectInfo.forwardDescriptorSet.GetDescriptorSet(),{});
-	aCommandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, Vulkan::GetPipelineLayout(Vulkan::RenderStageType::Forward), 1, 
-		Vulkan::TextureDescriptor::GetInstance().GetDescriptorSet(),{});
+	Vulkan::BindPipelineLayout(aCommandBuffer,aObjectInfo.descriptorSetCollection,Vulkan::PipelineLayoutType::DefaultPipeline);
 
 	uint32_t startInstance = 0;
 	
@@ -163,6 +167,10 @@ void SceneRenderer::Internal::RenderForward(vk::CommandBuffer aCommandBuffer, Sc
 	{
 		const uint32_t instanceCount = static_cast<uint32_t>(instanceMap.data()[i].size());
 		
+		if (instanceCount == 0)
+		{
+			continue;
+		}
 
 		Vulkan::MeshId meshId = instanceMap.dataKeys()[i].meshId;
 
@@ -198,10 +206,7 @@ void SceneRenderer::Internal::CopyToFinalImage(vk::CommandBuffer aCommandBuffer,
 		
 		auto& material = Wonder::GetMaterialRegistry().AccessAssetFromID(Wonder::FULLSCREEN_COPY_SWAPCHAIN);
 		
-		aCommandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, material.GetPipelineLayout(), 0,
-		aObjectInfo.cubemapDescriptorSet.GetDescriptorSet(), {});
-		aCommandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, material.GetPipelineLayout(), 1, 
-			Vulkan::TextureDescriptor::GetInstance().GetDescriptorSet(),{});
+		Vulkan::BindPipelineLayout(aCommandBuffer,aObjectInfo.descriptorSetCollection,Vulkan::PipelineLayoutType::DefaultPipeline);
 		
 		material.RemoveRenderImages();
 		material.AddRenderImage(aImageInfo.intermediateImage.GetRenderImageId(engine.GetCurrentSwapchainIndex()));
@@ -214,10 +219,7 @@ void SceneRenderer::Internal::CopyToFinalImage(vk::CommandBuffer aCommandBuffer,
 		
 		auto& material = Wonder::GetMaterialRegistry().AccessAssetFromID(Wonder::FULLSCREEN_COPY_OFFSCREEN);
 		
-		aCommandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, material.GetPipelineLayout(), 0,
-		aObjectInfo.cubemapDescriptorSet.GetDescriptorSet(), {});
-		aCommandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, material.GetPipelineLayout(), 1, 
-			Vulkan::TextureDescriptor::GetInstance().GetDescriptorSet(),{});
+		Vulkan::BindPipelineLayout(aCommandBuffer,aObjectInfo.descriptorSetCollection,Vulkan::PipelineLayoutType::DefaultPipeline);
 		
 		material.RemoveRenderImages();
 		material.AddRenderImage(aImageInfo.intermediateImage.GetRenderImageId(engine.GetCurrentSwapchainIndex()));

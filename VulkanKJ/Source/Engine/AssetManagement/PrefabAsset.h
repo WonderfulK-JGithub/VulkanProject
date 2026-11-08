@@ -2,23 +2,46 @@
 #include <nlohmann/json.hpp>
 #include <vulkan/vulkan.hpp>
 
+#include "ECS/Components/TransformComponent.h"
 #include "ECS/Reflection/ComponentData.h"
 #include "ID/IdTypes.h"
-#include "Vulkan/Image/Texture.h"
+#include "Util/Container/FixedString.h"
+#include "Util/Container/MappedVector.hpp"
 
 namespace Wonder
 {
+    struct PrefabObjectData
+    {
+        PrefabObjectId objectId{};
+        PrefabObjectId parentId{};
+        PrefabId basePrefabId;
+        Goose::TransformTRS transform;
+        std::vector<ComponentData> components;
+        Goose::String32 name = "123";
+    };
+    
     class PrefabAsset
     {
     public:
         void Init(const nlohmann::json& aJson);
-        void SaveToJson(nlohmann::json& aJson);
+        void SaveToJson(nlohmann::json& aJso, const char* aName);
+    
+        static PrefabAsset MakeDefault(const char* aName);
         
-        std::vector<ComponentData>& AccessComponents();
+        Goose::MappedVector<PrefabObjectId,PrefabObjectData>& AccessPrefabObjects();
+        const Goose::MappedVector<PrefabObjectId,PrefabObjectData>& GetPrefabObjects() const;
+        
+        std::unordered_map<PrefabObjectId,std::vector<PrefabObjectId>>& AccessParentToChildrenMap();
+        const std::unordered_map<PrefabObjectId,std::vector<PrefabObjectId>>& GetParentToChildrenMap() const;
+        
+        PrefabObjectId GetHeadObjectId() const; 
     private:
-        std::vector<ComponentData> myComponents;
         
-        PrefabId myId;
+        Goose::MappedVector<PrefabObjectId,PrefabObjectData> myPrefabObjects;
+        std::unordered_map<PrefabObjectId,std::vector<PrefabObjectId>> myParentToChildrenMap;
+        
+        PrefabObjectId myHeadObjectId{};
+        PrefabId myId{};
     };
 }
 

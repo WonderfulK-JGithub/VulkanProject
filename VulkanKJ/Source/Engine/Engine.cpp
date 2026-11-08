@@ -42,6 +42,10 @@ Engine::Engine(int aWidth, int aHeight, GLFWwindow* aWindow) {
 	localCurrentEngine = this;
 
 	Wonder::LoadSettings();
+	Wonder::LoadIdCounters();
+
+	Wonder::EnsureComponentTypesAreLoaded();
+	Wonder::ComponentTypeBase::FinalizeTypeRegistry();
 	
 	LOG_INFO("%s","Making a graphics engine");
 
@@ -55,11 +59,6 @@ Engine::Engine(int aWidth, int aHeight, GLFWwindow* aWindow) {
 	SceneRenderer::CreateSceneObjectInfo(mySceneObjectInfo);
 	
 	MakeAssets();
-	
-	Wonder::LoadIdCounters();
-
-	Wonder::EnsureComponentTypesAreLoaded();
-	Wonder::ComponentTypeBase::FinalizeTypeRegistry();
 	
 	Wonder::FileWatcher::Init();
 }
@@ -161,7 +160,7 @@ void Engine::FinalizeSetup()
 	VkInit::DescriptorSetLayoutData descriptorSetInput;
 	descriptorSetInput.count = 1;
 	descriptorSetInput.types.push_back(vk::DescriptorType::eCombinedImageSampler);
-	myTextureDescriptorPool = VkInit::MakeDescriptorPool(myLogicalDevice, 128, descriptorSetInput);
+	myTextureDescriptorPool = VkInit::MakeDescriptorPool(myLogicalDevice, Vulkan::MAX_TEXTURES + Vulkan::MAX_CUBE_MAPS, descriptorSetInput);
 	myTextureDescriptor.Init();
 	
 	Vulkan::CreatePipelineLayouts();
@@ -482,16 +481,16 @@ void Engine::RenderScene(VkScene* aScene)
 			10.f);
 		projection[1][1] *= -1.f;
 		
-		mySceneObjectInfo.cameraMatrixData.view = view;
-		mySceneObjectInfo.cameraMatrixData.projection = projection;
-		mySceneObjectInfo.cameraMatrixData.viewProjection = projection * view;
+		mySceneObjectInfo.cameraData.view = view;
+		mySceneObjectInfo.cameraData.projection = projection;
+		mySceneObjectInfo.cameraData.viewProjection = projection * view;
 	}
 
 	{
 		
-		mySceneObjectInfo.cameraVectorData.right = view[0];
-		mySceneObjectInfo.cameraVectorData.up = view[1];
-		mySceneObjectInfo.cameraVectorData.forward = view[2];
+		mySceneObjectInfo.cameraData.right = view[0];
+		mySceneObjectInfo.cameraData.up = view[1];
+		mySceneObjectInfo.cameraData.forward = view[2];
 	}
 	
 	mySceneObjectInfo.cubemapMaterial = Wonder::TEST_CUBEMAP_MATERIAL;

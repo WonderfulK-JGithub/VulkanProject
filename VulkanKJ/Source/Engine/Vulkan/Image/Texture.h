@@ -25,6 +25,7 @@ namespace Vulkan
 		void Init(const Filepath& aFilepath);
 		void InitCubemap(const std::vector<Filepath>& aFilepaths);
 		
+		bool IsCubemap() const;
 		void Destroy() const;
 		
 		vk::ImageView GetImageView() const;

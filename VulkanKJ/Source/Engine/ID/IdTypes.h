@@ -19,12 +19,15 @@ namespace Wonder
     DEFINE_ID_STRUCT(TextureId)
     DEFINE_ID_STRUCT(ModelId)
     DEFINE_ID_STRUCT(MaterialId)
+    
     DEFINE_ID_STRUCT(PrefabId)
+    DEFINE_ID_STRUCT(PrefabObjectId)
     
     constexpr TextureId NULL_TEXTURE{};
     constexpr ModelId NULL_MODEL{};
     constexpr MaterialId NULL_MATERIAL{};
     constexpr PrefabId NULL_PREFAB{};
+    constexpr PrefabObjectId NULL_PREFAB_OBJECT{};
     
     constexpr const char* ID_JSON_KEY = "id";
     constexpr const char* NAME_JSON_KEY = "name";
@@ -53,3 +56,4 @@ DEFINE_ID_HASH(Wonder::TextureId)
 DEFINE_ID_HASH(Wonder::ModelId)
 DEFINE_ID_HASH(Wonder::MaterialId)
 DEFINE_ID_HASH(Wonder::PrefabId)
+DEFINE_ID_HASH(Wonder::PrefabObjectId)

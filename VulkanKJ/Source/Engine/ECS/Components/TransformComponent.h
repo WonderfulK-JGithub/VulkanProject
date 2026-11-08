@@ -4,17 +4,31 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/vec3.hpp>
 
+#include "Math/MatrixUtil.h"
+
 namespace Goose
 {
+    struct TransformTRS
+    {
+        glm::vec3 translation;
+        glm::vec3 rotation;
+        glm::vec3 scale{1.f,1.f,1.f};
+    };
+    
     struct TransformComponent
     {
         TransformComponent() = default;
         TransformComponent(const glm::mat4x4& aMatrix)
         {
-            glm::vec3 skew;
-            glm::vec4 perspective;
-            glm::decompose(aMatrix, position, rotation, scale, skew, perspective);
+            Wonder::DecomposeMatrix(aMatrix,position,rotation,scale);
             rotation = glm::normalize(rotation);
+        }
+        
+        TransformComponent(const TransformTRS& aTRS)
+        {
+            position = aTRS.translation;
+            rotation = glm::quat(aTRS.rotation);
+            scale = aTRS.scale;
         }
         
         TransformComponent(const glm::vec3& aPosition, const glm::quat& aRotation, const glm::vec3& aScale) 

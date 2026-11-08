@@ -165,6 +165,35 @@ uint8_t Wonder::ImGuiUtil::DisplayModelReferenceEdit(ModelId& aId)
 	return DisplayAssetReferenceEdit(aId.id, MODEL_FILE_EXTENSION);
 }
 
+uint8_t Wonder::ImGuiUtil::DisplayMaterialReferenceEdit(MaterialId& aId)
+{
+	assetExistFunction = [](const IdType aId)
+	{
+		return GetMaterialRegistry().AssetExists(MaterialId(aId));
+	};
+	assetNameFunction = [](const IdType aId)
+	{
+		return GetMaterialRegistry().GetNameFromID(MaterialId(aId));
+	};
+	assetPathFunction = [](const IdType aId)
+	{
+		return GetMaterialRegistry().GetAssetFilePath(MaterialId(aId));
+	};
+
+	assetIdFunction = [](const char* aName)
+	{
+		return GetMaterialRegistry().GetIDFromName(aName).id;
+	};
+
+	allIdsAndNamesFunction = []()
+	{
+		auto& map = GetMaterialRegistry().GetIdToNameMap();
+		return std::tuple{reinterpret_cast<const IdType*>(map.dataKeys()), map.data(), map.size()};
+	};
+
+	return DisplayAssetReferenceEdit(aId.id, MATERIAL_FILE_EXTENSION);
+}
+
 uint8_t Wonder::ImGuiUtil::DisplayTextureReferenceEdit(TextureId& aId)
 {
 	assetExistFunction = [](const IdType aId)
@@ -214,7 +243,7 @@ void Wonder::ImGuiUtil::DrawFieldBoxColored(const char* aFieldText,const ImVec4 
 		IM_COL32(70, 70, 70, 255));
 }
 
-bool Wonder::ImGuiUtil::DisplayCombo(const char* aLabel, const char** aNames, const uint32_t aCount, uint32_t& aCurrentSelection, const float* aColors, const char* aDefaultDisplayValue)
+bool Wonder::ImGuiUtil::DisplayCombo(const char* aLabel, const char*const*  aNames, const uint32_t aCount, uint32_t& aCurrentSelection, const float* aColors, const char* aDefaultDisplayValue)
 {
 	bool edited = false;
 

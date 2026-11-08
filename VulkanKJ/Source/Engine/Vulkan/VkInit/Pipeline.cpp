@@ -53,9 +53,6 @@ vk::Pipeline VkInit::MakeGraphicsPipeline(const GraphicsPipelineInBundle& aSpeci
     colorBlendAttachementState.blendEnable = VK_FALSE;
     vk::PipelineColorBlendStateCreateInfo colorBlendInfo = MakeColorBlendStateInfo(colorBlendAttachementState);
     pipelineInfo.pColorBlendState = &colorBlendInfo;
-
-    
-    LOG_DEBUG("%s","Creating PipelineLayout");
     
     pipelineInfo.layout = aSpecification.layout;
 

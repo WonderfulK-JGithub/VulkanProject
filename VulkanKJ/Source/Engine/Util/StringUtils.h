@@ -27,11 +27,14 @@ namespace Goose::StringUtils
     }
     
     std::vector<std::string> SplitString(std::string aLine, const std::string& aDelimiter);
-    std::vector<std::string> SplitString(const std::vector<std::string>& aTexts, const std::string& aDelimiter);
+    std::vector<std::string> SplitStrings(const std::vector<std::string>& aTexts, const std::string& aDelimiter);
     std::string GetAfter(std::string aLine, const std::string& aDelimiter);
     std::string GetBefore(std::string aLine, const std::string& aDelimiter);
-    
+    std::string GetBetween(const std::string& aLine,const std::string& aBegin,const std::string& aEnd);
     void RemoveAll(std::string& aText,char aCharacter);
     void RemoveAll(std::string& aText,const char* aCharacters);
+    void RemoveComments(std::string& aText);
+    
+     
 }
 

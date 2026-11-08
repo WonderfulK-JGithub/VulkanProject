@@ -183,7 +183,7 @@ void Vulkan::DisplayDebugTap()
         
         if (ImGui::Button("Reflect"))
         {
-            ShaderReflection::GetShaderPushConstantTypes(localAllShaderNamesAndPaths.at(selectedShader));
+            ShaderReflection::GetShaderReflectionInfo(localAllShaderNamesAndPaths.at(selectedShader),true);
         }
     }
     DebugUtilities::EndDebugTabItem();

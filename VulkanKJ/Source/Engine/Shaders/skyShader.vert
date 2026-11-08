@@ -2,15 +2,12 @@
 
 // vulkan NDC:	x: -1(left), 1(right)
 //				y: -1(top), 1(bottom)
+#extension GL_GOOGLE_include_directive : require
 
-layout(set = 0,binding = 0) uniform CameraVectors
-{
-	vec4 right;
-	vec4 up;
-	vec4 forward;
-} cameraData;
-
-layout(location = 0) out vec3 fragForwards;
+#pragma region Dependencies
+#include "VertexOutputs/CubemapVertexOut.glsl"
+#include "PipelineLayouts/DefaultPipelineLayout.glsl"
+#pragma endregion
 
 const vec2 screen_corners[6] = vec2[](
 	vec2(-1.0, -1.0),

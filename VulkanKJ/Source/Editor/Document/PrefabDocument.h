@@ -27,15 +27,19 @@ namespace Wonder
         void Close() override;
         void Save() override;
 
-        void CommandUpdateComponents(const std::vector<ComponentData>& aComponents);
+        void CommandUpdatePrefab(const PrefabAsset& aPrefabAsset);
     private:
-        void MakeUpdateComponentsCommand();
+        void MakeUpdateCommand();
         
         void GenerateSubDocks() override;
+        
+        void DisplayHierarchy();
+        void DisplayHierarchyObject(PrefabObjectId aPrefabObjectId);
         
         void DisplayProperties();
         void DisplayAddComponent();
         
+        void RecreatePrefab() const;
         void PrepareRenderInfo();
         
         SceneRenderer::SceneObjectInfo mySceneObjectInfo;
@@ -47,9 +51,11 @@ namespace Wonder
         ECS::ECSInstance myEcs;
         PrefabAsset myReferencePrefab;
         PrefabAsset myEditPrefab;
+        
+        ECS::EntityReference mySelection{};
         PrefabId myId;
         
-        ECS::Entity myPrefabEntity;
+        ECS::EntityID myPrefabHeadEntityId{123};
         
         ImGuiWindowFlags myWindowFlags{};
     

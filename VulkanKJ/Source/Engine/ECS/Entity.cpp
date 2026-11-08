@@ -34,7 +34,7 @@ namespace
     {
         if (reinterpret_cast<ECS::Entity*>(&aId)->IsValid() == false) return;
 	    ECS::globalCurrentECS->archetypeManager.RemoveEntityFromArchetype(aId);
-        ECS::globalCurrentECS->entityIndex.erase(aId);
+        ECS::globalCurrentECS->entityRecords.erase(aId);
     }
 }
 namespace ECS
@@ -65,7 +65,7 @@ namespace ECS
             return false;
         }
         
-        return globalCurrentECS->entityIndex.contains(myEntityID);
+        return globalCurrentECS->entityRecords.contains(myEntityID);
     }
 
     bool Entity::IsStatic() const
@@ -77,6 +77,11 @@ namespace ECS
         }
 
         return GetEntityRecord(myEntityID).isStatic;
+    }
+
+    bool Entity::IsParent() const
+    {
+        return GetEntityRecord(myEntityID).isParent;
     }
 
     bool Entity::IsActive() const
@@ -146,7 +151,7 @@ namespace ECS
 
     const char* Entity::GetName() const
     {
-        return ECS::globalCurrentECS->entityIndex[myEntityID].name.c_str();
+        return ECS::globalCurrentECS->entityRecords[myEntityID].name.c_str();
     }
     
 
@@ -155,27 +160,28 @@ namespace ECS
         return myEntityID == aEntity.myEntityID;
     }
 
-    Entity CreateEntity(const bool aIsStatic, const Wonder::LayerIndex aLayer, const std::string_view aName, const EntityID aParentId)
+    Entity CreateEntity(const bool aIsStatic, const Wonder::LayerIndex aLayer, const std::string_view aName)
     {
-    	return CreateEntity(aIsStatic, aLayer, Internal::globalNextFreeEntityID++, aName, aParentId);
+    	return CreateEntity(aIsStatic, aLayer, Internal::globalNextFreeEntityID++, aName);
     }
 
-    Entity CreateEntity(const bool aIsStatic, const Wonder::LayerIndex aLayer, const EntityID aID, const std::string_view aName, const EntityID aParentId)
+    Entity CreateEntity(const bool aIsStatic, const Wonder::LayerIndex aLayer, const EntityID aID, const std::string_view aName)
     {
         ComponentID transformID = ECS::GetComponentID<Goose::TransformComponent>();
         Archetype& archetype = globalCurrentECS->archetypeManager.GetArchetype(std::set{ transformID });
-        if (globalCurrentECS->entityIndex.contains(aID))
+        if (globalCurrentECS->entityRecords.contains(aID))
         {
-            LOG_WARNING("Tried to create an entity with an already existing ID! old: %s new: %s", globalCurrentECS->entityIndex[aID].name.data(), aName.data());
+            LOG_WARNING("Tried to create an entity with an already existing ID! old: %s new: %s", globalCurrentECS->entityRecords[aID].name.data(), aName.data());
         }
         
-        ECS::globalCurrentECS->entityIndex.emplace(aID, EntityRecord{
+        ECS::globalCurrentECS->entityRecords.emplace(aID, EntityRecord{
             .archetype = &archetype,
             .name = aName.data(),
             .isStatic = aIsStatic,
             .isActive = true,
+            .isParent = false,
             .layer = aLayer,
-            .parent = aParentId
+            .parent = INVALID_ENTITY
         });
 
         if (archetype.entityCount >= archetype.capacity)
@@ -196,13 +202,8 @@ namespace ECS
 
         return aID;
     }
-	
-    void DeleteEntity(const Entity aEntity)
-    {
-        DeleteEntity(aEntity.GetID());
-    }
 
-    void DeleteEntity(EntityID aEntity)
+    void DeleteEntityFast(EntityID aEntity)
     {
         if (std::ranges::find(locToEraseEntities, aEntity) != locToEraseEntities.end())
         {
@@ -213,19 +214,56 @@ namespace ECS
         locToEraseEntities.emplace_back(aEntity);
     }
 
+    void DeleteEntity(const Entity aEntity)
+    {
+        DeleteEntity(aEntity.GetID());
+    }
+
+    void DeleteEntity(EntityID aEntity)
+    {
+        auto it = globalCurrentECS->parents.find(aEntity);
+        
+        if (it != globalCurrentECS->parents.end())
+        {
+            std::vector<EntityID> queuedEntities{};
+            for (auto& child : it->second.children)
+            {
+                queuedEntities.emplace_back(child);
+            }
+            
+            globalCurrentECS->parents.erase(it);
+
+            while (queuedEntities.empty() == false)
+            {
+                EntityID currentEntity = queuedEntities.back();
+                queuedEntities.pop_back();
+                
+                it = globalCurrentECS->parents.find(currentEntity);
+                
+                if (it != globalCurrentECS->parents.end())
+                {
+                    for (auto& child : it->second.children)
+                    {
+                        queuedEntities.emplace_back(child);
+                    }
+                    
+                    globalCurrentECS->parents.erase(it);
+                }
+                
+                DeleteEntityFast(currentEntity);
+            }
+        }
+        
+        DeleteEntityFast(aEntity);
+    }
+
     void DeleteAllEntities()
     {
-	    for (size_t i = 0; i < ECS::globalCurrentECS->entityIndex.size(); ++i)
+	    for (size_t i = 0; i < ECS::globalCurrentECS->entityRecords.size(); ++i)
 	    {
-            EntityID dataKey = ECS::globalCurrentECS->entityIndex.dataKeys()[i];
-
-            if (std::ranges::find(locToEraseEntities, dataKey) != locToEraseEntities.end())
-            {
-                LOG_WARNING("Tried to delete a already deleted entity!");
-                continue;
-            }
-
-            locToEraseEntities.emplace_back(dataKey);
+            EntityID dataKey = ECS::globalCurrentECS->entityRecords.dataKeys()[i];
+	        
+	        DeleteEntityFast(dataKey);
 	    }
     }
 
@@ -236,7 +274,7 @@ namespace ECS
 
     size_t GetEntityCount()
     {
-        return ECS::globalCurrentECS->entityIndex.size();
+        return ECS::globalCurrentECS->entityRecords.size();
     }
 
     bool EntityExists(const EntityID aID)
@@ -245,12 +283,70 @@ namespace ECS
 		{
             return false;
 		}
-        return ECS::globalCurrentECS->entityIndex.contains(aID);
+        return ECS::globalCurrentECS->entityRecords.contains(aID);
+    }
+
+    Entity GetEntityFromReference(const EntityReference aEntityReference)
+    {
+        auto it = globalCurrentECS->referenceToIdMap.find(aEntityReference);
+        
+        if (it != globalCurrentECS->referenceToIdMap.end())
+        {
+            return it->second;
+        }
+        
+        return aEntityReference.headEntityId;
+    }
+
+    void AssignParentToEntity(EntityID aChild, EntityID aNewParent)
+    {
+        EntityRecord& childEntityRecord = globalCurrentECS->entityRecords.at(aChild);
+        
+        if (childEntityRecord.parent == aNewParent)
+        {
+            LOG_WARNING("Tried to parent %s[%llu] to a parent it already had!",childEntityRecord.name.c_str(),aChild);
+            return;
+        }
+        
+        if (childEntityRecord.parent != INVALID_ENTITY)
+        {
+            auto& previousParentInfo = globalCurrentECS->parents.at(childEntityRecord.parent);
+            previousParentInfo.children.erase(std::ranges::find(previousParentInfo.children,aChild));
+        }
+        
+        childEntityRecord.parent = aNewParent;
+        
+        if (aNewParent != INVALID_ENTITY)
+        {
+            auto it = globalCurrentECS->parents.find(aNewParent);
+        
+            EntityRecord& parentEntityRecord = globalCurrentECS->entityRecords.at(aNewParent);
+            parentEntityRecord.isParent = true;
+            
+            if (it != globalCurrentECS->parents.end())
+            {
+                it->second.children.push_back(aChild);
+            }
+            else
+            {
+                if (parentEntityRecord.parent == INVALID_ENTITY)
+                {
+                    globalCurrentECS->topParents.emplace_back(aChild);
+                }
+                
+                globalCurrentECS->parents.emplace(aNewParent, EntityParentInfo{.children = std::vector{aChild}, 
+                    .lastTransform = *Entity(aNewParent).GetComponent<Goose::TransformComponent>()});
+            }
+        }
+        else if (childEntityRecord.isParent)
+        {
+            globalCurrentECS->topParents.emplace_back(aChild);
+        }
     }
 
     EntityRecord& GetEntityRecord(const EntityID aEntityID)
     {
-        return ECS::globalCurrentECS->entityIndex.at(aEntityID);
+        return ECS::globalCurrentECS->entityRecords.at(aEntityID);
     }
     
     void Entity::MoveComponentData(const EntityID aEntityID, Archetype* oldArchetype, Archetype* newArchetype, const std::set<ComponentID>& aComponentIDsToMove)
@@ -278,6 +374,26 @@ namespace ECS
                     oldColumn.data + oldArchetypeLastIndex * newColumn.componentSize);
                 componentInfo->destructor(oldColumn.data + oldArchetypeLastIndex * oldColumn.componentSize);
             }
+        }
+    }
+    
+    void Entity::ParentUpdate(const EntityID aParentEntityId)
+    {
+        auto it = globalCurrentECS->parents.find(aParentEntityId);
+        
+        if (it == globalCurrentECS->parents.end())
+        {
+            return;
+        }
+
+        const glm::mat4x4 parentTransformation = glm::inverse(glm::mat4x4(it->second.lastTransform)) * glm::mat4x4(*Entity(aParentEntityId).GetTransform());
+        
+        for (auto& childId : it->second.children)
+        {
+            Goose::TransformComponent& childTransform = *Entity(childId).GetTransform();
+            childTransform = glm::mat4x4(childTransform) * parentTransformation;
+            
+            ParentUpdate(childId);
         }
     }
 

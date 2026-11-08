@@ -7,7 +7,12 @@ namespace ECS
 	struct ECSInstance
 	{
 		ArchetypeManager archetypeManager;
-		Goose::MappedVector<EntityID, EntityRecord> entityIndex;
+		Goose::MappedVector<EntityID, EntityRecord> entityRecords;
+		
+		std::vector<EntityID> topParents;
+		std::unordered_map<EntityID,EntityParentInfo> parents;
+		
+		std::unordered_map<EntityReference,EntityID> referenceToIdMap;
 	};
 
 	inline ECSInstance* globalCurrentECS;

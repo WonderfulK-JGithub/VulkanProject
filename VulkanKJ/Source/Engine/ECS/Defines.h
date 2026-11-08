@@ -4,6 +4,7 @@
 #include <vector>
 #include <functional>
 #include "Id/IdTypes.h"
+#include "Components/TransformComponent.h"
 
 namespace ECS
 {
@@ -31,10 +32,37 @@ namespace ECS
 
 		bool isStatic = false;
 		bool isActive = true;
+		bool isParent = false;
 		Wonder::LayerIndex layer{};
 		EntityID parent = INVALID_ENTITY;
+	};
+	
+	struct EntityParentInfo
+	{
+		std::vector<EntityID> children;
+		Goose::TransformComponent lastTransform;
+	};
+	
+	struct EntityReference
+	{
+		EntityID headEntityId;
+		Wonder::PrefabObjectId prefabObjectId;
+		
+		bool operator==(const EntityReference& other) const
+		{
+			return prefabObjectId == other.prefabObjectId && headEntityId == other.headEntityId;
+		}
 	};
 
 	static constexpr float ARCHETYPE_SIZE_INCREASE_SCALAR = 2;
 	static constexpr float COMPONENT_FUTURES_SIZE_INCREASE_SCALAR = 2;
 }
+
+template<>
+struct std::hash<ECS::EntityReference>
+{
+	std::size_t operator()(const ECS::EntityReference& aReference) const noexcept
+	{
+		return std::hash<ECS::EntityID>{}(aReference.headEntityId) * std::hash<Wonder::PrefabObjectId>{}(aReference.prefabObjectId);
+	}
+};

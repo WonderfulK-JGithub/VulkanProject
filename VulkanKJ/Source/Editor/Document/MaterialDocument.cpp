@@ -3,12 +3,21 @@
 #include <Engine.h>
 #include <imgui_internal.h>
 #include <AssetManagement/AssetRegistry.h>
+#include <AssetManagement/TextureAsset.h>
 #include <AssetManagement/Loaders/MaterialBuildQueue.h>
 #include <Command/GenericCommands/UpdateCommand.hpp>
 #include <Shaders/Shaders.h>
 #include <Util/ImGuiUtil.h>
 
 #include "EditorGlobals.h"
+
+static std::unordered_map<Wonder::MaterialType,Tga::StringId> localDefaultVertexShaders{
+    {Wonder::MaterialType::Mesh,"shader.vert"_tgaid},
+    {Wonder::MaterialType::Mesh,"shader.vert"_tgaid},
+    {Wonder::MaterialType::Mesh,"shader.vert"_tgaid},
+    {Wonder::MaterialType::Mesh,"shader.vert"_tgaid},
+};
+static std::unordered_map<Wonder::MaterialType,Tga::StringId> localDefaultFragmentShaders{{Wonder::MaterialType::Mesh,"shader.vert"_tgaid}};
 
 void Wonder::MaterialDocument::Init(const Filepath& aFilePath)
 {
@@ -32,6 +41,8 @@ void Wonder::MaterialDocument::Init(const Filepath& aFilePath)
     
     SceneRenderer::CreateSceneObjectInfo(mySceneObjectInfo);
     mySceneObjectInfo.cubemapMaterial = TEST_CUBEMAP_MATERIAL;
+    
+    myCameraController.SetPosition(glm::vec3(0.0f, 1.0f, 5.0f));
 }
 
 void Wonder::MaterialDocument::Update([[maybe_unused]] float aDeltaTime)
@@ -72,10 +83,12 @@ void Wonder::MaterialDocument::Save()
     
     nlohmann::json saveJson;
     saveMaterial.SaveToJson(saveJson);
-    FileFunctions::SaveFileFromJson(saveJson,GetMaterialRegistry().GetAssetFilePath(mySavedMaterialId));
+    FileFunctions::SaveFileFromJson(GetDataPath() / GetMaterialRegistry().GetAssetFilePath(mySavedMaterialId),saveJson);
     
     Engine::GetInstance().WaitForIdle();
     MaterialBuildQueue::AddMaterialToQueue(mySavedMaterialId);
+    
+    myCommandManager.SetSaveCommandCount();
 }
 
 void Wonder::MaterialDocument::CommandUpdateMaterial(const MaterialAsset& aMaterial)
@@ -112,6 +125,19 @@ void Wonder::MaterialDocument::DisplayProperties()
 {
     uint8_t info = 0;
     bool needsRebuild = false;
+    
+    ImGui::TextUnformatted("Type");
+    uint32_t currentSelection = static_cast<uint32_t>(AccessEditMaterial().GetMaterialType());
+    if (ImGuiUtil::DisplayCombo("##Type",globalMaterialTypeNames,std::size(globalMaterialTypeNames),currentSelection))
+    {
+        MaterialType newMaterialType = static_cast<MaterialType>(currentSelection);
+        if (newMaterialType != AccessEditMaterial().GetMaterialType())
+        {
+            info |= InfoFlag_EditEnded;
+            needsRebuild = true;
+        }
+    }
+    
     {
         ImGui::TextUnformatted("Vertex Shader");
         ImGui::SameLine();
@@ -142,6 +168,8 @@ void Wonder::MaterialDocument::DisplayProperties()
 
     for (auto& pushConstant : AccessEditMaterial().AccessPushConstants())
     {
+        uint8_t pushConstantEditInfo = 0;
+        
         switch (pushConstant.info.type)
         {
             case ShaderReflection::PushConstantType::Padding:
@@ -157,40 +185,63 @@ void Wonder::MaterialDocument::DisplayProperties()
             case ShaderReflection::PushConstantType::TextureIndex:
             {
                 TextureId textureId = *reinterpret_cast<TextureId*>(pushConstant.info.data.data());
-                DISPLAY_WITH_COPY(info,pushConstant.name.c_str(),textureId,ImGuiUtil::DisplayTextureReferenceEdit(textureId));
+                DISPLAY_WITH_COPY(pushConstantEditInfo,pushConstant.name.c_str(),textureId,ImGuiUtil::DisplayTextureReferenceEdit(textureId));
+                
+                if ((pushConstantEditInfo & InfoFlag_ChangedValue) != 0u &&
+                    GetTextureRegistry().AccessAssetFromID(textureId).IsCubemap())
+                {
+                    LOG_WARNING("%s","You assigned a cubemap texture to a regular texture slot, epic fail!");
+                }
+                
                 std::copy_n(reinterpret_cast<char*>(&textureId),sizeof(textureId),pushConstant.info.data.data());
             }
                 break;
+            case ShaderReflection::PushConstantType::CubemapIndex:
+            {
+                TextureId cubemapTextureId = *reinterpret_cast<TextureId*>(pushConstant.info.data.data());
+                DISPLAY_WITH_COPY(pushConstantEditInfo,pushConstant.name.c_str(),cubemapTextureId,ImGuiUtil::DisplayTextureReferenceEdit(cubemapTextureId));
+                
+                if ((pushConstantEditInfo & InfoFlag_ChangedValue) != 0u &&
+                    GetTextureRegistry().AccessAssetFromID(cubemapTextureId).IsCubemap() == false)
+                {
+                    LOG_WARNING("%s","You assigned a regular texture to a cubemap texture slot, epic fail!");
+                }
+                
+                std::copy_n(reinterpret_cast<char*>(&cubemapTextureId),sizeof(cubemapTextureId),pushConstant.info.data.data());
+            }
+            break;
             case ShaderReflection::PushConstantType::Float:
             {
                 float floatValue = *reinterpret_cast<float*>(pushConstant.info.data.data());
-                DISPLAY_WITH_COPY(info,pushConstant.name.c_str(),floatValue,ImGuiUtil::DisplayDragFloat("#floatValue",&floatValue));
+                DISPLAY_WITH_COPY(pushConstantEditInfo,pushConstant.name.c_str(),floatValue,ImGuiUtil::DisplayDragFloat("##floatValue",&floatValue));
                 std::copy_n(reinterpret_cast<char*>(&floatValue),sizeof(floatValue),pushConstant.info.data.data());
             }
                 break;
             case ShaderReflection::PushConstantType::Vector2:
             {
                 glm::vec2 vector2Value = *reinterpret_cast<glm::vec2*>(pushConstant.info.data.data());
-                DISPLAY_WITH_COPY(info,pushConstant.name.c_str(),vector2Value,ImGuiUtil::DisplayDragFloat2("#vector2Value",&vector2Value.x));
+                DISPLAY_WITH_COPY(pushConstantEditInfo,pushConstant.name.c_str(),vector2Value,ImGuiUtil::DisplayDragFloat2("##vector2Value",&vector2Value.x));
                 std::copy_n(reinterpret_cast<char*>(&vector2Value),sizeof(vector2Value),pushConstant.info.data.data());
             }
                 break;
             case ShaderReflection::PushConstantType::Vector3:
             {
                 glm::vec3 vector3Value = *reinterpret_cast<glm::vec3*>(pushConstant.info.data.data());
-                DISPLAY_WITH_COPY(info,pushConstant.name.c_str(),vector3Value,ImGuiUtil::DisplayDragFloat3("#vector3Value",&vector3Value.x));
+                DISPLAY_WITH_COPY(pushConstantEditInfo,pushConstant.name.c_str(),vector3Value,ImGuiUtil::DisplayDragFloat3("##vector3Value",&vector3Value.x));
                 std::copy_n(reinterpret_cast<char*>(&vector3Value),sizeof(vector3Value),pushConstant.info.data.data());
             }
                 break;
             case ShaderReflection::PushConstantType::Color:
             {
                 glm::vec4 colorValue = *reinterpret_cast<glm::vec4*>(pushConstant.info.data.data());
-                DISPLAY_WITH_COPY(info,pushConstant.name.c_str(),colorValue,
+                DISPLAY_WITH_COPY(pushConstantEditInfo,pushConstant.name.c_str(),colorValue,
                     ImGuiUtil::DisplayColor4("#colorValue",&colorValue.r,ImGuiColorEditFlags_NoInputs));
                 std::copy_n(reinterpret_cast<char*>(&colorValue),sizeof(colorValue),pushConstant.info.data.data());
             }
                 break;
         }
+        
+        info |= pushConstantEditInfo;
     }
     
     if (needsRebuild)

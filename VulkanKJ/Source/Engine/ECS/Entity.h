@@ -68,6 +68,7 @@ namespace ECS
 		bool IsValid() const;
 
 		bool IsStatic() const;
+		bool IsParent() const;
 
 		bool IsActive() const;
 		void SetIsActive(bool aIsActive) const;
@@ -92,18 +93,25 @@ namespace ECS
 
 		static void MoveComponentData(EntityID aEntityID, Archetype* oldArchetype, Archetype* newArchetype, const std::set<ComponentID>& aComponentIDsToMove);
 
+		static void ParentUpdate(const EntityID aParentEntity);
+		
 		static void FlushFutureComponents();
 		static void FlushFutureRemovedComponents();
 	};
 
-	Entity CreateEntity(bool aIsStatic = false, Wonder::LayerIndex aLayer = 0, std::string_view aName = "Undefined", EntityID aParentId = INVALID_ENTITY);
-	Entity CreateEntity(bool aIsStatic, Wonder::LayerIndex aLayer, EntityID aID, std::string_view aName = "Undefined", EntityID aParentId = INVALID_ENTITY);
+	Entity CreateEntity(bool aIsStatic = false, Wonder::LayerIndex aLayer = 0, std::string_view aName = "Undefined");
+	Entity CreateEntity(bool aIsStatic, Wonder::LayerIndex aLayer, EntityID aID, std::string_view aName = "Undefined");
+	void DeleteEntityFast(EntityID aEntity);
 	void DeleteEntity(Entity aEntity);
 	void DeleteEntity(EntityID aEntity);
 	void DeleteAllEntities();
 	Entity GetEntityFromID(EntityID aID);
 	size_t GetEntityCount();
 	bool EntityExists(EntityID aID);
+	
+	Entity GetEntityFromReference(EntityReference aEntityReference);
+	
+	void AssignParentToEntity(EntityID aChild, EntityID aNewParent);
 
 	template<typename ...Components>
 	bool FindEntity(Entity& aEntityOut);

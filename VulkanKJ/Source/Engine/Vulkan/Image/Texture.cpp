@@ -46,6 +46,11 @@ void Vulkan::Texture::InitCubemap(const std::vector<Filepath>& aFilepaths)
 	Init();
 }
 
+bool Vulkan::Texture::IsCubemap() const
+{
+	return myIsCubemap;
+}
+
 void Vulkan::Texture::Destroy() const
 {
 	myLogicalDevice.freeMemory(myImageMemory);

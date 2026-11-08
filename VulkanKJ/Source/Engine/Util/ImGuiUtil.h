@@ -71,12 +71,13 @@ namespace Wonder::ImGuiUtil
 	};
 	
 	uint8_t DisplayModelReferenceEdit(ModelId& aId);
+	uint8_t DisplayMaterialReferenceEdit(MaterialId& aId);
 	uint8_t DisplayTextureReferenceEdit(TextureId& aId);
 	
 	void DrawFieldBox(const char* aFieldText);
 	void DrawFieldBoxColored(const char* aFieldText, ImVec4 aColor);
 
-	bool DisplayCombo(const char* aLabel, const char** aNames, uint32_t aCount, uint32_t& aCurrentSelection, const float* aColors = nullptr, const char* aDefaultDisplayValue = "");
+	bool DisplayCombo(const char* aLabel, const char*const* aNames, uint32_t aCount, uint32_t& aCurrentSelection, const float* aColors = nullptr, const char* aDefaultDisplayValue = "");
 	bool DisplayCombo(const char* aLabel, const Tga::StringId* aNames, uint32_t aCount, Tga::StringId& aCurrentSelection);
 	bool DisplayComboFiltered(const char* aLabel, const Tga::StringId* aNames, uint32_t aCount, Tga::StringId& aCurrentSelection,
 		Goose::String32& aFilter);

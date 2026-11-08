@@ -4,6 +4,7 @@
 #include "RenderStage.h"
 #include "Vulkan/Buffer/VulkanBuffer.h"
 #include "Vulkan/VkInit/Descriptors.h"
+#include "Vulkan/VkInit/PipelineLayout.h"
 
 namespace SceneRenderer
 {
@@ -28,18 +29,15 @@ namespace SceneRenderer
         Wonder::ModelInstanceContainer instances;
         std::vector<Vulkan::LineVertex> linePoints;
         
-        VkInit::CameraMatrices cameraMatrixData;
-        VkInit::CameraVectors cameraVectorData;
+        VkInit::CameraData cameraData;
         
         Wonder::MaterialId cubemapMaterial;
         
-        Vulkan::VulkanBuffer cameraMatrixBuffer;
-        Vulkan::VulkanBuffer cameraVectorBuffer;
+        Vulkan::VulkanBuffer cameraDataBuffer;
         Vulkan::VulkanBuffer instanceBuffer;
         Vulkan::VulkanBuffer lineVertexBuffer;
 	
-        VkInit::VulkanDescriptorSet cubemapDescriptorSet;
-        VkInit::VulkanDescriptorSet forwardDescriptorSet;
+        Vulkan::DescriptorSetCollection descriptorSetCollection;
         VkInit::DescriptorWriter descriptorWriter;
     };
     

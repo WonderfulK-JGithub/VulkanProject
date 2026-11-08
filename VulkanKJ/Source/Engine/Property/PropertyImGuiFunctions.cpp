@@ -280,4 +280,17 @@ uint8_t PropertyEdit::DisplayImGuiPropertyEdit(Wonder::ModelId& aData, const cha
 	return info;
 }
 
+uint8_t PropertyEdit::DisplayImGuiPropertyEdit(Wonder::MaterialId& aData, const char* aLabel)
+{
+	uint8_t info = 0;
+
+	ImGui::PushID(aLabel);
+	info |= DisplayCopiableLabel(aLabel,aData);
+
+	info |= DisplayMaterialReferenceEdit(aData);
+
+	ImGui::PopID();
+	return info;
+}
+
 

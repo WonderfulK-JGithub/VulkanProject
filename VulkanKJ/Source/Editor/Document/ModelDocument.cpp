@@ -88,17 +88,6 @@ void Wonder::ModelDocument::GenerateSubDocks()
 
 void Wonder::ModelDocument::PrepareRenderInfo()
 {
-    const glm::mat4 view = myCameraController.GetView();
-    
-    glm::mat4 projection = myCameraController.GetProjection();
-    
-    mySceneObjectInfo.cameraMatrixData.view = view;
-    mySceneObjectInfo.cameraMatrixData.projection = projection;
-    mySceneObjectInfo.cameraMatrixData.viewProjection = projection * view;
-
-    mySceneObjectInfo.cameraVectorData.right = myCameraController.GetTransform()[0];
-    mySceneObjectInfo.cameraVectorData.up = myCameraController.GetTransform()[1];
-    mySceneObjectInfo.cameraVectorData.forward = -myCameraController.GetTransform()[2];
-    
+    myCameraController.SetSceneCameraInfo(mySceneObjectInfo);
     mySceneObjectInfo.linePoints = myLineGrid.GetLinePoints();
 }

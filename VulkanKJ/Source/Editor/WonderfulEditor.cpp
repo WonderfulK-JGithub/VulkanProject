@@ -6,6 +6,7 @@
 #include <imgui_internal.h>
 #include <AssetManagement/AssetRegistry.h>
 #include <ID/IdFunctions.h>
+#include <Input/KeyboardInput.h>
 #include <nlohmann/json.hpp>
 #include <Shaders/Shaders.h>
 #include <Util/FileManagement/FileDialog.h>
@@ -81,6 +82,17 @@ void WonderfulEditor::Update()
             myDocuments[i]->Close();
             myDocuments.erase(myDocuments.begin() + i);
             i--;
+        }
+    }
+    
+    if (KeyboardInput::IsKeyDown(KeyboardInput::Keycode::Control) && KeyboardInput::IsKeyPressed(KeyboardInput::Keycode::S))
+    {
+        for (uint32_t i = 0; i < static_cast<uint32_t>(myDocuments.size()); ++i)
+        {
+            if (myDocuments[i]->WasVisibleLastFrame())
+            {
+                myDocuments[i]->Save();
+            }
         }
     }
     
@@ -252,9 +264,9 @@ void WonderfulEditor::MakeFileExtensionFunctions() const
     };
     localExtensionToDefaultData[Wonder::PREFAB_FILE_EXTENSION] = [](const char* aFilename)
     {
-        return nlohmann::json{
-            {Wonder::ID_JSON_KEY,Wonder::GeneratePrefabId().id},{Wonder::NAME_JSON_KEY,aFilename}
-        };
+        nlohmann::json json;
+        Wonder::PrefabAsset::MakeDefault(aFilename).SaveToJson(json,aFilename);
+        return json;
     };
     localExtensionToDefaultData[Wonder::MATERIAL_FILE_EXTENSION] = [](const char* aFilename)
     {
@@ -290,7 +302,7 @@ void WonderfulEditor::CreateAsset(const Filepath& aFilepath,const char* aExtensi
     Filepath savePath = aFilepath;
     savePath.replace_extension(aExtension);
     
-    std::string filename = aFilepath.string();
+    std::string filename = aFilepath.filename().string();
 
     const nlohmann::json jsonMetaData = localExtensionToDefaultData[aExtension](filename.c_str());
     FileFunctions::SaveFileFromJson(savePath, jsonMetaData);

@@ -48,6 +48,14 @@ Wonder::PrefabId Wonder::GeneratePrefabId()
     return newId;
 }
 
+Wonder::PrefabObjectId Wonder::GeneratePrefabObjectId()
+{
+    Wonder::PrefabObjectId newId{localPrefabIdCounter};
+    localPrefabIdCounter++;
+    localIdCountersNeedSaving = true;
+    return newId;
+}
+
 bool Wonder::IdCountersNeedSaving()
 {
     return localIdCountersNeedSaving;

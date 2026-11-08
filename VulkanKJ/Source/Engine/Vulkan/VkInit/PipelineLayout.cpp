@@ -5,7 +5,7 @@
 
 namespace Vulkan
 {
-    static std::unordered_map<RenderStageType, vk::PipelineLayout> localPipelineLayouts;
+    static std::unordered_map<PipelineLayoutType, vk::PipelineLayout> localPipelineLayouts;
     
     vk::PipelineLayout MakePipelineLayout(vk::Device aDevice, const std::vector<vk::DescriptorSetLayout>& aDescriptorSetLayouts)
     {
@@ -37,21 +37,12 @@ namespace Vulkan
     {
         vk::Device logicalDevice = Engine::GetInstance().GetLogicalDevice();
         
-        localPipelineLayouts[RenderStageType::Cubemap] = MakePipelineLayout(logicalDevice,
-        { VkInit::GetStageDescriptorSetLayout(RenderStageType::Cubemap),
-        TextureDescriptor::GetInstance().GetDescriptorSetLayout()});
-        
-        localPipelineLayouts[RenderStageType::Forward] = MakePipelineLayout(logicalDevice,
-        { VkInit::GetStageDescriptorSetLayout(RenderStageType::Forward),
-        TextureDescriptor::GetInstance().GetDescriptorSetLayout()});
-        
-        localPipelineLayouts[RenderStageType::FullscreenOffscreen] = MakePipelineLayout(logicalDevice,
-        { VkInit::GetStageDescriptorSetLayout(RenderStageType::FullscreenOffscreen),
-        TextureDescriptor::GetInstance().GetDescriptorSetLayout()});
-        
-        localPipelineLayouts[RenderStageType::FullscreenSwapchain] = MakePipelineLayout(logicalDevice,
-        { VkInit::GetStageDescriptorSetLayout(RenderStageType::FullscreenSwapchain),
-        TextureDescriptor::GetInstance().GetDescriptorSetLayout()});
+        localPipelineLayouts[PipelineLayoutType::DefaultPipeline] = MakePipelineLayout(logicalDevice,
+        { 
+            TextureDescriptor::GetInstance().GetDescriptorSetLayout(),
+            VkInit::GetDescriptorSetLayout(VkInit::DescriptorLayoutType::Camera),
+            VkInit::GetDescriptorSetLayout(VkInit::DescriptorLayoutType::ModelInstance),
+        });
     }
 
     void DestroyPipelineLayouts()
@@ -64,9 +55,29 @@ namespace Vulkan
         }
     }
 
-    vk::PipelineLayout GetPipelineLayout(RenderStageType aRenderStageType)
+    vk::PipelineLayout GetPipelineLayout(PipelineLayoutType aType)
     {
-        return localPipelineLayouts[aRenderStageType];
+        return localPipelineLayouts[aType];
+    }
+
+    void BindPipelineLayout(vk::CommandBuffer aCommandBuffer, const DescriptorSetCollection& aDescriptorSets, PipelineLayoutType aType)
+    {
+        switch (aType)
+        {
+            case PipelineLayoutType::DefaultPipeline:
+            {
+                vk::PipelineLayout pipelineLayout = Vulkan::GetPipelineLayout(Vulkan::PipelineLayoutType::DefaultPipeline);
+                
+                aCommandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, 
+                    Vulkan::TextureDescriptor::GetInstance().GetDescriptorSet(),{});
+                aCommandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 1, 
+                aDescriptorSets.globalDescriptorSet.GetDescriptorSet(),{});
+                aCommandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 2, 
+                aDescriptorSets.modelInstanceDescriptorSet.GetDescriptorSet(),{});
+                
+            }
+                break;
+        }
     }
 }
 

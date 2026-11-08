@@ -2,10 +2,33 @@
   "id": 1,
   "myFragmentShaderName": "shader.frag",
   "myMaterialType": 1,
-  "myRenderStage": 1,
-  "myTextureIds": [
-    219902325555200
+  "myPushConstants": [
+    {
+      "data": 0.0,
+      "name": "aRandomValue2",
+      "type": 3
+    },
+    {
+      "data": 0,
+      "name": "baseTextureIndex",
+      "type": 0
+    },
+    {
+      "name": "[PADDING]",
+      "type": 7
+    },
+    {
+      "data": [
+        1.0,
+        1.0,
+        1.0,
+        0.0
+      ],
+      "name": "colorValue",
+      "type": 6
+    }
   ],
+  "myRenderStage": 1,
   "myVertexShaderName": "shader.vert",
-  "name": "C:\\Users\\pizza\\Desktop\\VulkanKJ\\Assets\\data\\New_Material"
+  "name": "New_Material"
 }

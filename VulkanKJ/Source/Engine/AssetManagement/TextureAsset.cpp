@@ -55,7 +55,7 @@ void Wonder::TextureAsset::Load()
         myTexture.Init(texturePath);
     }
     
-    Vulkan::TextureDescriptor::GetInstance().AddTexture(myId,myTexture.GetImageView());
+    Vulkan::TextureDescriptor::GetInstance().AddTexture(myId,myTexture.GetImageView(),myTexture.IsCubemap());
     myIsLoaded = true;
     
 #ifndef _RETAIL
@@ -76,7 +76,7 @@ void Wonder::TextureAsset::Unload()
     
     myTexture.Destroy();
     
-    Vulkan::TextureDescriptor::GetInstance().RemoveTexture(myId);
+    Vulkan::TextureDescriptor::GetInstance().RemoveTexture(myId,myTexture.IsCubemap());
     
     myIsLoaded = false;
 #ifndef _RETAIL
@@ -87,6 +87,11 @@ void Wonder::TextureAsset::Unload()
 bool Wonder::TextureAsset::IsLoaded() const
 {
     return myIsLoaded;
+}
+
+bool Wonder::TextureAsset::IsCubemap() const
+{
+    return myIsLoaded && myTexture.IsCubemap();
 }
 
 VkDescriptorSet& Wonder::TextureAsset::GetImGuiDescriptorSet()

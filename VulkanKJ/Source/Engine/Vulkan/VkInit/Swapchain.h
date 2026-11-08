@@ -17,18 +17,14 @@ namespace VkInit
 		std::vector<vk::PresentModeKHR> presentModes;
 	};
 
-	struct CameraVectors
-	{
-		glm::vec4 right;
-		glm::vec4 up;
-		glm::vec4 forward;
-	};
-
-	struct CameraMatrices
+	struct CameraData
 	{
 		glm::mat4 view;
 		glm::mat4 projection;
 		glm::mat4 viewProjection;
+		glm::vec4 right;
+		glm::vec4 up;
+		glm::vec4 forward;
 	};
 
 	struct ModelInstance

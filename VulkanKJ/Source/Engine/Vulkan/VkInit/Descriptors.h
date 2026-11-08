@@ -5,16 +5,23 @@
 
 namespace Vulkan
 {
+	enum class PipelineLayoutType;
 	class VulkanBuffer;
 }
 
 namespace VkInit
 {
+	enum class DescriptorLayoutType
+	{
+		Camera,
+		ModelInstance,
+	};
+	
 	
 	void CreateStageDescriptorSetLayouts();
 	void DestroyStageDescriptorSetLayouts();
 
-	vk::DescriptorSetLayout GetStageDescriptorSetLayout(Vulkan::RenderStageType aStage);
+	vk::DescriptorSetLayout GetDescriptorSetLayout(DescriptorLayoutType aType);
 	
 	struct DescriptorSetLayoutData
 	{

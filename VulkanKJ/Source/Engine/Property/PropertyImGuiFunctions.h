@@ -56,6 +56,7 @@ namespace PropertyEdit
 	uint8_t DisplayImGuiPropertyEdit(Tga::StringId& aData, const char* aLabel);
 	
 	uint8_t DisplayImGuiPropertyEdit(Wonder::ModelId& aData, const char* aLabel);
+	uint8_t DisplayImGuiPropertyEdit(Wonder::MaterialId& aData, const char* aLabel);
 
 	template<typename T>
 	static uint8_t DisplayImGuiPropertyEdit(std::vector<T>& aData, const char* aLabel);

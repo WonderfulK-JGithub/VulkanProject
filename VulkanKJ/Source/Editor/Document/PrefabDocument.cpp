@@ -4,11 +4,13 @@
 #include <imgui_internal.h>
 #include <AssetManagement/AssetRegistry.h>
 #include <Command/GenericCommands/UpdateCommand.hpp>
+#include <ECS/ECSLoading.h>
 #include <ECS/Entity.h>
 #include <ECS/View.hpp>
 #include <ECS/Components/Rendering/ModelComponent.h>
 #include <ECS/Reflection/ComponentReflectionUtil.h>
 #include <ECS/Reflection/ComponentType.h>
+#include <ID/IdFunctions.h>
 #include <Input/KeyboardInput.h>
 
 #include "EditorGlobals.h"
@@ -29,15 +31,20 @@ void Wonder::PrefabDocument::Init(const Filepath& aFilePath)
     myPanelNames[static_cast<uint32_t>(PanelNames::Properties)] = "Properties##Document" + fileName;
     
     myWindowFlags = ImGuiWindowFlags_NoMove;
-    
-    ECS::ECSScope scope{&myEcs};
-    
-    myPrefabEntity = ECS::CreateEntity();
 	
 	SceneRenderer::CreateSceneObjectInfo(mySceneObjectInfo);
 	mySceneObjectInfo.cubemapMaterial = TEST_CUBEMAP_MATERIAL;
     
 	myCameraController.SetPosition(glm::vec3(0.0f, 1.0f, 5.0f));
+	
+	myEditPrefab = GetPrefabRegistry().AccessAssetFromID(myId);
+	myReferencePrefab = myEditPrefab;
+	
+	ECS::ECSScope scope{&myEcs};
+	ECS::Instantiate(myEditPrefab,{},myPrefabHeadEntityId);
+	
+	mySelection.headEntityId = myPrefabHeadEntityId;
+	mySelection.prefabObjectId = myEditPrefab.GetHeadObjectId();
 }
 
 void Wonder::PrefabDocument::Update([[maybe_unused]] float aDeltaTime)
@@ -49,10 +56,10 @@ void Wonder::PrefabDocument::Update([[maybe_unused]] float aDeltaTime)
         return;
     }
 	
+	ECS::ECSScope ecsScope{&myEcs};
+	
 	myCameraController.Update();
 	myLineGrid.MakeLines(glm::xyz(myCameraController.GetTransform()[3]),10);
-	
-	ECS::ECSScope ecsScope{&myEcs};
 	
 	ImGui::Begin(myPanelNames[static_cast<uint32_t>(PanelNames::Viewport)].c_str(),nullptr,myWindowFlags);
 	
@@ -66,7 +73,7 @@ void Wonder::PrefabDocument::Update([[maybe_unused]] float aDeltaTime)
 	ImGui::End();
     	
 	ImGui::Begin(myPanelNames[static_cast<uint32_t>(PanelNames::Hierarchy)].c_str(),nullptr,myWindowFlags);
-	ImGui::Text("cdefg");
+	DisplayHierarchy();
 	ImGui::End();
     	
 	ImGui::Begin(myPanelNames[static_cast<uint32_t>(PanelNames::Properties)].c_str(),nullptr,myWindowFlags);
@@ -97,38 +104,32 @@ void Wonder::PrefabDocument::Close()
 
 void Wonder::PrefabDocument::Save()
 {
+	PrefabAsset& prefab = GetPrefabRegistry().AccessAssetFromID(myId);
+	prefab = myEditPrefab;
+    
+	nlohmann::json saveJson;
+	prefab.SaveToJson(saveJson,nullptr);
+	FileFunctions::SaveFileFromJson(GetDataPath() / GetPrefabRegistry().GetAssetFilePath(myId),saveJson);
+	
 	myCommandManager.SetSaveCommandCount();
 }
 
-void Wonder::PrefabDocument::CommandUpdateComponents(const std::vector<ComponentData>& aComponents)
+void Wonder::PrefabDocument::CommandUpdatePrefab(const PrefabAsset& aPrefabAsset)
 {
-	myEditPrefab.AccessComponents() = aComponents;
+	myEditPrefab = aPrefabAsset;
 
-	const bool isStatic = ECS::Entity(myPrefabEntity).IsStatic();
-	const LayerIndex layer = ECS::Entity(myPrefabEntity).GetLayer();
-
-	ECS::DeleteEntity(myPrefabEntity);
-	ECS::Entity::FlushFutures();
-
-	ECS::CreateEntity(isStatic, layer, myPrefabEntity.GetID());
-
-	{
-		for (const ComponentData& componentData : aComponents)
-		{
-			componentData.GetType()->OnGameComponentCreate(ECS::Entity(myPrefabEntity), componentData.AccessData());
-		}
-	}
+	RecreatePrefab();
 }
 
-void Wonder::PrefabDocument::MakeUpdateComponentsCommand()
+void Wonder::PrefabDocument::MakeUpdateCommand()
 {
-	auto updateFunction = [](void* aPrefabDocument, IdType , const std::vector<ComponentData>& aComponentDatas)
+	auto updateFunction = [](void* aPrefabDocument, IdType , const PrefabAsset& aPrefabAsset)
 	{
-		static_cast<PrefabDocument*>(aPrefabDocument)->CommandUpdateComponents(aComponentDatas);
+		static_cast<PrefabDocument*>(aPrefabDocument)->CommandUpdatePrefab(aPrefabAsset);
 	};
 
-	const std::shared_ptr<UpdateCommand<std::vector<ComponentData>>> updateCommand = std::make_shared<
-		UpdateCommand<std::vector<ComponentData>>>(this, 0, myReferencePrefab.AccessComponents(), myEditPrefab.AccessComponents(), updateFunction);
+	const std::shared_ptr<UpdateCommand<PrefabAsset>> updateCommand = std::make_shared<
+		UpdateCommand<PrefabAsset>>(this, 0, myReferencePrefab, myEditPrefab, updateFunction);
 	myCommandManager.AddAndExecute(updateCommand);
 	
 	myReferencePrefab = myEditPrefab;
@@ -158,12 +159,99 @@ void Wonder::PrefabDocument::GenerateSubDocks()
     ImGui::DockBuilderFinish(dockSpaceId);
 }
 
+void Wonder::PrefabDocument::DisplayHierarchy()
+{
+	DisplayHierarchyObject(myEditPrefab.GetHeadObjectId());
+}
+
+void Wonder::PrefabDocument::DisplayHierarchyObject(PrefabObjectId aPrefabObjectId)
+{
+	ECS::EntityReference reference{myPrefabHeadEntityId,aPrefabObjectId};
+	
+	int treeNodeFlags = ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+	
+	if (reference == mySelection)
+	{
+		treeNodeFlags |= ImGuiTreeNodeFlags_Selected;
+	}
+	
+	PrefabObjectData& prefabObject = myEditPrefab.AccessPrefabObjects().at(reference.prefabObjectId);
+	
+	char stringBuffer[256];
+	
+	if (aPrefabObjectId == myEditPrefab.GetHeadObjectId())
+	{
+		sprintf_s(stringBuffer, ICON_LC_CROWN " %s", prefabObject.name.c_str());
+	}
+	else
+	{
+		sprintf_s(stringBuffer, ICON_LC_SMILE " %s", prefabObject.name.c_str());
+	}
+	
+	ImGui::PushID(stringBuffer);
+	
+	bool open = ImGui::TreeNodeEx(stringBuffer, treeNodeFlags);
+	
+	if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+	{
+		mySelection = reference;
+		LOG_INFO("%ull selected",mySelection.prefabObjectId.id);
+	}
+	
+	if (open)
+	{
+		auto it = myEditPrefab.AccessParentToChildrenMap().find(aPrefabObjectId);
+		
+		if (it != myEditPrefab.AccessParentToChildrenMap().end())
+		{
+			for (auto& childId : it->second)
+			{
+				DisplayHierarchyObject(childId);
+			}
+		}
+		
+		ImGui::TreePop();
+	}
+	
+	if (ImGui::BeginPopupContextItem())
+	{
+		if (ImGui::Button("Create Child" ICON_LC_SMILE_PLUS))
+		{
+			PrefabObjectData childObject{};
+			childObject.objectId = GeneratePrefabObjectId();
+			childObject.basePrefabId = myId;
+			childObject.name = "Prefab_Child";
+			childObject.parentId = aPrefabObjectId;
+    
+			myEditPrefab.AccessPrefabObjects().emplace(childObject.objectId,childObject);
+			
+			auto it = myEditPrefab.AccessParentToChildrenMap().find(aPrefabObjectId);
+			
+			if (it != myEditPrefab.AccessParentToChildrenMap().end())
+			{
+				it->second.push_back(childObject.objectId);
+			}
+			else
+			{
+				myEditPrefab.AccessParentToChildrenMap().emplace(aPrefabObjectId,std::vector<PrefabObjectId>{childObject.objectId});
+			}
+			
+			MakeUpdateCommand();
+		}
+		
+		ImGui::EndPopup();
+	}
+	
+	ImGui::PopID();
+}
+
 void Wonder::PrefabDocument::DisplayProperties()
 {
-    auto& componentDatas = myEditPrefab.AccessComponents();
+	PrefabObjectData& selectedPrefabObject = myEditPrefab.AccessPrefabObjects().at(mySelection.prefabObjectId);
+    auto& componentDatas = selectedPrefabObject.components;
 
     Reflection::globalReflectionMode = Reflection::ReflectionMode::Display;
-    Reflection::globalCurrentReflectedId = myPrefabEntity.GetID();
+    Reflection::globalCurrentReflectedId = ECS::GetEntityFromReference(mySelection).GetID();
 
     for (int componentIndex = 0; componentIndex < static_cast<int>(componentDatas.size()); ++componentIndex)
     {
@@ -183,7 +271,7 @@ void Wonder::PrefabDocument::DisplayProperties()
         if (removed)
         {
             componentDatas.erase(componentDatas.begin() + componentIndex);
-        	MakeUpdateComponentsCommand();
+        	MakeUpdateCommand();
 
             ImGui::PopID();
             break;
@@ -205,11 +293,11 @@ void Wonder::PrefabDocument::DisplayProperties()
             if ((Reflection::globalInfoFlag & Wonder::InfoFlag_EditEnded) != 0)
             {
                 LOG_INFO("Updated property %s",type->GetName());
-                MakeUpdateComponentsCommand();
+                MakeUpdateCommand();
             }
             else if ((Reflection::globalInfoFlag & Wonder::InfoFlag_ChangedValue) != 0)
             {
-                type->SetComponentData(ECS::Entity(myPrefabEntity), data);
+                type->SetComponentData(ECS::Entity(myPrefabHeadEntityId), data);
             }
         }
 
@@ -221,8 +309,6 @@ void Wonder::PrefabDocument::DisplayAddComponent()
 {
     static Tga::StringId locSelectedNewComponent;
 	constexpr const char* componentPopupName = "Component_Popup";
-
-	auto& componentDatas       = myEditPrefab.AccessComponents();
 
 	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.2f,0.5f,0.2f,1.f });
 	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.0f);
@@ -283,6 +369,9 @@ void Wonder::PrefabDocument::DisplayAddComponent()
 		{
 			const ComponentTypeBase* newType = Wonder::GetComponentType(locSelectedNewComponent);
 
+			PrefabObjectData& selectedPrefabObject = myEditPrefab.AccessPrefabObjects().at(mySelection.prefabObjectId);
+			auto& componentDatas = selectedPrefabObject.components;
+			
 			bool alreadyExists = false;
 			for (const auto& existingComponentData : componentDatas)
 			{
@@ -296,11 +385,11 @@ void Wonder::PrefabDocument::DisplayAddComponent()
 			if (alreadyExists == false)
 			{
 				componentDatas.emplace_back(newType);
-				MakeUpdateComponentsCommand();
+				MakeUpdateCommand();
 			}
 			else
 			{
-				LOG_WARNING("Property set of type %s already exists!",newType->GetName());
+				LOG_WARNING("Component of type %s already exists!",newType->GetName());
 			}
 
 			ImGui::CloseCurrentPopup();
@@ -315,6 +404,14 @@ void Wonder::PrefabDocument::DisplayAddComponent()
 
 		ImGui::EndPopup();
 	}
+}
+
+void Wonder::PrefabDocument::RecreatePrefab() const
+{
+	ECS::DeleteEntity(myPrefabHeadEntityId);
+	ECS::Entity::FlushFutures();
+
+	ECS::Instantiate(myEditPrefab,{},myPrefabHeadEntityId);
 }
 
 void Wonder::PrefabDocument::PrepareRenderInfo()
@@ -336,13 +433,13 @@ void Wonder::PrefabDocument::PrepareRenderInfo()
 			VkInit::ModelInstance modelInstance;
 			modelInstance.transform = transform;
 			
-			if (GetModelRegistry().AssetExists(modelComponent.modelId))
+			if (GetModelRegistry().AssetExists(modelComponent.modelId) && GetMaterialRegistry().AssetExists(modelComponent.materialId))
 			{
 				const ModelAsset& modelAsset = GetModelRegistry().AccessAssetFromID(modelComponent.modelId);
 
 				for (uint32_t meshIndex = 0; meshIndex < modelAsset.GetMeshes().size(); ++meshIndex)
 				{
-					mySceneObjectInfo.instances.AddInstance(TEST_MATERIAL_1,modelAsset.GetMeshes()[meshIndex].id,modelInstance);
+					mySceneObjectInfo.instances.AddInstance(modelComponent.materialId,modelAsset.GetMeshes()[meshIndex].id,modelInstance);
 				}
 			}
 		}

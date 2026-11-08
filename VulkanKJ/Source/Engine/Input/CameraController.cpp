@@ -55,13 +55,13 @@ void CameraController::SetSceneCameraInfo(SceneRenderer::SceneObjectInfo& aScene
 {
     const glm::mat4 viewMatrix = GetView();
     
-    aSceneObjectInfo.cameraMatrixData.view = viewMatrix;
-    aSceneObjectInfo.cameraMatrixData.projection = myProjection;
-    aSceneObjectInfo.cameraMatrixData.viewProjection = myProjection * viewMatrix;
+    aSceneObjectInfo.cameraData.view = viewMatrix;
+    aSceneObjectInfo.cameraData.projection = myProjection;
+    aSceneObjectInfo.cameraData.viewProjection = myProjection * viewMatrix;
 
-    aSceneObjectInfo.cameraVectorData.right = myTransform[0];
-    aSceneObjectInfo.cameraVectorData.up = myTransform[1];
-    aSceneObjectInfo.cameraVectorData.forward = -myTransform[2];
+    aSceneObjectInfo.cameraData.right = myTransform[0];
+    aSceneObjectInfo.cameraData.up = myTransform[1];
+    aSceneObjectInfo.cameraData.forward = -myTransform[2];
 }
 
 glm::mat4x4 CameraController::GetView() const

@@ -1,4 +1,79 @@
 {
-  "id": 1,
-  "name": "C:\\Users\\pizza\\Desktop\\VulkanKJ\\Assets\\data\\New_Prefab"
+  "id": 7,
+  "myHeadObject": 8,
+  "name": "New_Prefab",
+  "objectDataList": [
+    {
+      "basePrefabId": 7,
+      "components": [
+        {
+          "!type": "Model",
+          "Custom Data": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Is Visible": false,
+          "Material": 219902325555200,
+          "Model": 219902325555202,
+          "allowedOverrides": 0
+        }
+      ],
+      "name": "New_Prefab",
+      "objectId": 8,
+      "parentId": 0,
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "basePrefabId": 7,
+      "components": [
+        {
+          "!type": "Model",
+          "Custom Data": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Is Visible": false,
+          "Material": 1,
+          "Model": 219902325555203,
+          "allowedOverrides": 0
+        }
+      ],
+      "name": "Prefab_Child",
+      "objectId": 9,
+      "parentId": 8,
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ]
 }

@@ -24,6 +24,8 @@ namespace Wonder
 		Fullscreen,
 	};
 	
+	inline constexpr const char* globalMaterialTypeNames[]{"Skybox","Mesh","Line","Fullscreen"};
+	
 	struct PushConstantProperty
 	{
 		ShaderReflection::PushConstantInfo info;
@@ -48,6 +50,8 @@ namespace Wonder
 		Tga::StringId& AccessVertexShaderName();
 		Tga::StringId& AccessFragmentShaderName();
 		std::vector<PushConstantProperty>& AccessPushConstants();
+		
+		MaterialType GetMaterialType() const;
 		
 		void SetRenderStage(Vulkan::RenderStageType aRenderStage);
 		void SetMaterialType(const MaterialType& aMaterialType);

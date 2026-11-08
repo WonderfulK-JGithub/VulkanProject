@@ -2,28 +2,14 @@
 
 // vulkan NDC:	x: -1(left), 1(right)
 //				y: -1(top), 1(bottom)
+#extension GL_GOOGLE_include_directive : require
 
-layout(set = 0,binding = 0) uniform UBO
-{
-	mat4 view;
-	mat4 projection;
-	mat4 viewProjection;
-} cameraData;
+#pragma region Dependencies
+#include "VertexInputs/LineVertex.glsl"
+#include "VertexOutputs/ColorOnlyVertexOut.glsl"
 
-struct ModelInstance
-{
-	mat4 transform;
-};
-
-layout(std140,set = 0, binding = 1) readonly buffer storageBuffer
-{
-	ModelInstance instances[];
-} InstanceData;
-
-layout(location = 0) in vec3 vertexPosition;
-layout(location = 1) in vec4 vertexColor;
-
-layout(location = 0) out vec4 fragColor;
+#include "PipelineLayouts/DefaultPipelineLayout.glsl"
+#pragma endregion
 
 void main() {
 	gl_Position = cameraData.viewProjection * InstanceData.instances[gl_InstanceIndex].transform * vec4(vertexPosition, 1.0);

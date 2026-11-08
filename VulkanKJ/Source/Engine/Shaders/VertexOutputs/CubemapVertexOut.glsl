@@ -1,0 +1,1 @@
+layout(location = 0) out vec3 fragForwards;

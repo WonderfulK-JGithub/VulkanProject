@@ -45,6 +45,7 @@ includedirs {
 		dirs.engine .. "**.natvis",
 		dirs.engine .. "**.vert",
 		dirs.engine .. "**.frag",
+		dirs.engine .. "**.glsl",
 
 		dirs.external .. "imgui/imgui.cpp",
 		dirs.external .. "imgui/imgui_demo.cpp",

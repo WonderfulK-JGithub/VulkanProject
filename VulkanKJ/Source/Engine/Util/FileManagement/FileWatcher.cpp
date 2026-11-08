@@ -136,6 +136,8 @@ namespace Wonder::FileWatcher
             
             if (Vulkan::CompileShader(shaderPath,spvFilePath,Vulkan::GetShaderKind(shaderFileName)))
             {
+                ShaderReflection::GetShaderReflectionInfo(shaderPath,true);
+                
                 Vulkan::ReloadModule(shaderFileName,Engine::GetInstance().GetLogicalDevice(),Vulkan::GetShaderStage(shaderFileName.extension()));
                 Tga::StringId shaderId = Tga::StringRegistry::RegisterOrGetString(shaderFileName.string());
 

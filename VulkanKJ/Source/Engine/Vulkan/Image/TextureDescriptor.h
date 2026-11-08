@@ -7,6 +7,9 @@
 
 namespace Vulkan
 {
+    constexpr int MAX_TEXTURES = 128;
+    constexpr int MAX_CUBE_MAPS = 16;
+    
     class TextureDescriptor
     {
     public:
@@ -17,9 +20,10 @@ namespace Vulkan
         vk::DescriptorSet GetDescriptorSet();
         vk::DescriptorSetLayout GetDescriptorSetLayout();
         
-        void AddTexture(Wonder::TextureId aId,vk::ImageView aView);
-        void RemoveTexture(Wonder::TextureId aId);
+        void AddTexture(Wonder::TextureId aId,vk::ImageView aView,bool aIsCubemap);
+        void RemoveTexture(Wonder::TextureId aId,bool aIsCubemap);
         uint32_t GetTextureIndex(Wonder::TextureId aId);
+        uint32_t GetCubemapIndex(Wonder::TextureId aId);
         
         void AddRenderImage(RenderImageId aId,vk::ImageView aView);
         void RemoveRenderImage(RenderImageId aId);
@@ -36,6 +40,9 @@ namespace Vulkan
         
         Goose::MappedVector<RenderImageId,vk::ImageView> myRenderImageIdToView;
         std::unordered_map<RenderImageId,uint32_t> myRenderImageIdToIndex;
+        
+        Goose::MappedVector<Wonder::TextureId,vk::ImageView> myCubemapIdToView;
+        std::unordered_map<Wonder::TextureId,uint32_t> myCubemapIdToIndex;
         
         bool myNeedsDescriptorUpdate{};
     };

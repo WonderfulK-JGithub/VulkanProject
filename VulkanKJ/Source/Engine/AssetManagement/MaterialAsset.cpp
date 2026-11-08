@@ -72,10 +72,8 @@ void Wonder::MaterialAsset::Init(const nlohmann::json& aJson)
     
     AdjustPushConstantsToReflection();
     
-    myRenderStage = aJson["myRenderStage"].get<Vulkan::RenderStageType>();
+    SetRenderStage(aJson["myRenderStage"].get<Vulkan::RenderStageType>());
     myMaterialType = aJson["myMaterialType"].get<MaterialType>();
-    
-    myGraphicsPipelineLayout = Vulkan::GetPipelineLayout(myRenderStage);
     
     Build();
 }
@@ -156,7 +154,7 @@ void Wonder::MaterialAsset::CopyFromOther(const MaterialAsset& aOther)
 void Wonder::MaterialAsset::AdjustPushConstantsToReflection()
 {
     Goose::MappedVector<std::string,ShaderReflection::PushConstantInfo> actualPushConstants = 
-        ShaderReflection::GetShaderPushConstantTypes(Vulkan::GetAllFragmentNamesAndPaths().at(myFragmentShaderName));
+        ShaderReflection::GetShaderReflectionInfo(Vulkan::GetAllFragmentNamesAndPaths().at(myFragmentShaderName)).pushConstantsInfo;
 
     for (auto& pushConstant : myPushConstants)
     {
@@ -229,10 +227,15 @@ std::vector<Wonder::PushConstantProperty>& Wonder::MaterialAsset::AccessPushCons
     return myPushConstants;
 }
 
+Wonder::MaterialType Wonder::MaterialAsset::GetMaterialType() const
+{
+    return myMaterialType;
+}
+
 void Wonder::MaterialAsset::SetRenderStage(const Vulkan::RenderStageType aRenderStage)
 {
     myRenderStage = aRenderStage;
-    myGraphicsPipelineLayout = Vulkan::GetPipelineLayout(aRenderStage);
+    myGraphicsPipelineLayout = Vulkan::GetPipelineLayout(Vulkan::PipelineLayoutType::DefaultPipeline);
 }
 
 void Wonder::MaterialAsset::SetMaterialType(const MaterialType& aMaterialType)
@@ -274,6 +277,14 @@ void Wonder::MaterialAsset::Bind(const vk::CommandBuffer aCommandBuffer,Vulkan::
                 std::copy_n(reinterpret_cast<char*>(&textureIndex),sizeof(textureIndex),uploadPushConstantData.data() + currentSize);
             }
                 break;
+            case ShaderReflection::PushConstantType::CubemapIndex:
+            {
+                uint32_t cubemapIndex = Vulkan::TextureDescriptor::GetInstance().GetCubemapIndex(*
+                    reinterpret_cast<const TextureId*>(pushConstant.info.data.data()));
+                uploadPushConstantData.resize(currentSize + sizeof(cubemapIndex));
+                std::copy_n(reinterpret_cast<char*>(&cubemapIndex),sizeof(cubemapIndex),uploadPushConstantData.data() + currentSize);
+            }
+            break;
             case ShaderReflection::PushConstantType::RenderImageIndex:
             {
                 uint32_t renderImageIndex = Vulkan::TextureDescriptor::GetInstance().GetRenderImageTextureIndex(*

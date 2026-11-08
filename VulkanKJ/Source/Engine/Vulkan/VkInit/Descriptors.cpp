@@ -6,7 +6,7 @@
 
 namespace VkInit
 {
-	static std::unordered_map<Vulkan::RenderStageType, vk::DescriptorSetLayout> descriptorSetLayouts;
+	static std::unordered_map<DescriptorLayoutType, vk::DescriptorSetLayout> localDescriptorSetLayouts;
 }
 
 void VkInit::CreateStageDescriptorSetLayouts()
@@ -16,49 +16,39 @@ void VkInit::CreateStageDescriptorSetLayouts()
 
 		input.count = 1;
 
-
 		input.indices.push_back(0);
 		input.types.push_back(vk::DescriptorType::eUniformBuffer);
 		input.counts.push_back(1);
-		input.stages.push_back(vk::ShaderStageFlagBits::eVertex);
+		input.stages.push_back(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
 
-		descriptorSetLayouts[Vulkan::RenderStageType::Cubemap] = VkInit::MakeDescriptorSetLayout(Engine::GetInstance().GetLogicalDevice(), input);
-		
-		descriptorSetLayouts[Vulkan::RenderStageType::FullscreenSwapchain] = 
-			VkInit::MakeDescriptorSetLayout(Engine::GetInstance().GetLogicalDevice(), input);
-		descriptorSetLayouts[Vulkan::RenderStageType::FullscreenOffscreen] = 
-			VkInit::MakeDescriptorSetLayout(Engine::GetInstance().GetLogicalDevice(), input);
+		localDescriptorSetLayouts[DescriptorLayoutType::Camera] = VkInit::MakeDescriptorSetLayout(Engine::GetInstance().GetLogicalDevice(), input);
 	}
-
+	
 	{
 		VkInit::DescriptorSetLayoutData input{};
-		input.count = 2;
+
+		input.count = 1;
 
 		input.indices.push_back(0);
-		input.types.push_back(vk::DescriptorType::eUniformBuffer);
-		input.counts.push_back(1);
-		input.stages.push_back(vk::ShaderStageFlagBits::eVertex);
-
-		input.indices.push_back(1);
 		input.types.push_back(vk::DescriptorType::eStorageBuffer);
 		input.counts.push_back(1);
-		input.stages.push_back(vk::ShaderStageFlagBits::eVertex);
+		input.stages.push_back(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
 
-		descriptorSetLayouts[Vulkan::RenderStageType::Forward] = VkInit::MakeDescriptorSetLayout(Engine::GetInstance().GetLogicalDevice(), input);
+		localDescriptorSetLayouts[DescriptorLayoutType::ModelInstance] = VkInit::MakeDescriptorSetLayout(Engine::GetInstance().GetLogicalDevice(), input);
 	}
 }
 
 void VkInit::DestroyStageDescriptorSetLayouts()
 {
-	for (auto& [key,descriptorSetLayout] : descriptorSetLayouts)
+	for (auto& [key,descriptorSetLayout] : localDescriptorSetLayouts)
 	{
 		Engine::GetInstance().GetLogicalDevice().destroyDescriptorSetLayout(descriptorSetLayout);
 	}
 }
 
-vk::DescriptorSetLayout VkInit::GetStageDescriptorSetLayout(const Vulkan::RenderStageType aStage)
+vk::DescriptorSetLayout VkInit::GetDescriptorSetLayout(const DescriptorLayoutType aType)
 {
-	return descriptorSetLayouts.at(aStage);
+	return localDescriptorSetLayouts.at(aType);
 }
 
 vk::DescriptorSetLayout VkInit::MakeDescriptorSetLayout(const vk::Device aDevice, const DescriptorSetLayoutData& aInput)
