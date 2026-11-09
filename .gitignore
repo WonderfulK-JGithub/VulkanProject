@@ -8,6 +8,7 @@
 *.obj
 
 [Tt]emp/
+[Bi]n/*.lib
 *.slnx
 *.idea
 *.vs
@@ -20,7 +21,6 @@
 # Compiled Dynamic libraries
 *.so
 *.dylib
-*.dll
 
 # Fortran module files
 *.mod
@@ -31,8 +31,14 @@
 *.lai
 *.la
 *.a
-*.lib
+
 
 # Executables
 *.out
 *.app
+
+# These are over 100mb
+*shaderc_combined.lib
+*shaderc_combinedd.lib
+*SPIRV-Tools-opt.lib
+*SPIRV-Tools-optd.lib
