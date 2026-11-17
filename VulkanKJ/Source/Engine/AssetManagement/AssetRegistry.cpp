@@ -117,6 +117,8 @@ void Wonder::RegisterDefaultMaterials()
 		triangleMaterial.SetMaterialType(MaterialType::Mesh);
 		triangleMaterial.AddTexture(Wonder::TEST_TEXTURE_1);
 	
+		triangleMaterial.AdjustPushConstantsToReflection();
+		
 		triangleMaterial.Build();
 		
 		localMaterialRegistry.RegisterAssetCopy(triangleMaterial,TEST_MATERIAL_1,"Triangle_Material");
@@ -131,6 +133,7 @@ void Wonder::RegisterDefaultMaterials()
 		squareMaterial.SetMaterialType(MaterialType::Mesh);
 		squareMaterial.AddTexture(Wonder::TEST_TEXTURE_2);
 	
+		squareMaterial.AdjustPushConstantsToReflection();
 		squareMaterial.Build();
 		
 		localMaterialRegistry.RegisterAssetCopy(squareMaterial,TEST_MATERIAL_2,"Square_Material");
@@ -145,6 +148,7 @@ void Wonder::RegisterDefaultMaterials()
 		objMaterial.SetMaterialType(MaterialType::Mesh);
 		objMaterial.AddTexture(Wonder::TEST_TEXTURE_3);
 	
+		objMaterial.AdjustPushConstantsToReflection();
 		objMaterial.Build();
 		
 		localMaterialRegistry.RegisterAssetCopy(objMaterial,TEST_MATERIAL_3,"Default_Obj_Material");

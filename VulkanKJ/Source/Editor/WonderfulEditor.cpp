@@ -160,7 +160,7 @@ void WonderfulEditor::OpenDocument(const Filepath& aFilepath)
         LOG_WARNING("Cannot open file: %s\nExtension %s not supported",aFilepath.string().c_str(),extension.string().c_str());
     }
     
-    const std::string fileName = aFilepath.filename().generic_string();
+    const std::string fileName = aFilepath.filename().replace_extension().generic_string();
 
     const Tga::StringId fileID = Tga::StringRegistry::RegisterOrGetString(fileName);
     

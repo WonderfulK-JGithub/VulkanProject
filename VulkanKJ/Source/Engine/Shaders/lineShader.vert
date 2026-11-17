@@ -12,6 +12,6 @@
 #pragma endregion
 
 void main() {
-	gl_Position = cameraData.viewProjection * InstanceData.instances[gl_InstanceIndex].transform * vec4(vertexPosition, 1.0);
+	gl_Position = cameraData.viewProjection * vec4(vertexPosition, 1.0);
 	fragColor = vertexColor;
 }

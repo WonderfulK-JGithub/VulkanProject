@@ -15,7 +15,7 @@ namespace Wonder
         PrefabObjectId objectId{};
         PrefabObjectId parentId{};
         PrefabId basePrefabId;
-        Goose::TransformTRS transform;
+        Goose::TransformTRS localTransform;
         std::vector<ComponentData> components;
         Goose::String32 name = "123";
     };
@@ -25,6 +25,8 @@ namespace Wonder
     public:
         void Init(const nlohmann::json& aJson);
         void SaveToJson(nlohmann::json& aJso, const char* aName);
+        
+        void AdoptPrefab(PrefabObjectId aParent,PrefabId aId);
     
         static PrefabAsset MakeDefault(const char* aName);
         
@@ -34,7 +36,8 @@ namespace Wonder
         std::unordered_map<PrefabObjectId,std::vector<PrefabObjectId>>& AccessParentToChildrenMap();
         const std::unordered_map<PrefabObjectId,std::vector<PrefabObjectId>>& GetParentToChildrenMap() const;
         
-        PrefabObjectId GetHeadObjectId() const; 
+        PrefabObjectId GetHeadObjectId() const;
+        PrefabId GetPrefabId() const;
     private:
         
         Goose::MappedVector<PrefabObjectId,PrefabObjectData> myPrefabObjects;

@@ -110,6 +110,7 @@ namespace Wonder
     void DocumentBase::SetPanelInfo(int& aInfo) const
     {
         aInfo = 0;
+        
         if (ImGui::IsWindowHovered())
         {
             aInfo |= PanelFlag_Hovered;

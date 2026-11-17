@@ -1,151 +1,170 @@
 #pragma once
 #include <unordered_map>
 
+#include "Util/Logging/Logging.h"
+
 namespace Goose
 {
 	// Unordered set & vector
-	template<typename ValueType, typename IndexType = size_t>
+	template<typename KeyType, typename IndexType = size_t>
 	class VectorSet
 	{
 	public:
-		ValueType& at(const IndexType aIndex);
-		const ValueType& at(const IndexType aIndex) const;
+		KeyType& at(const IndexType aIndex);
+		const KeyType& at(const IndexType aIndex) const;
 
 		// Note: this does not create a new element if it doesn't exist, unlike std:s maps
-		ValueType& operator[](const IndexType aIndex);
-		const ValueType& operator[](const IndexType aIndex) const;
+		KeyType& operator[](const IndexType aIndex);
+		const KeyType& operator[](const IndexType aIndex) const;
 
-		ValueType* data();
-		const ValueType* data() const;
+		KeyType* data();
+		const KeyType* data() const;
 
-		bool insert(const ValueType& aValue);
+		bool insert(const KeyType& aValue);
 
-		void erase(const ValueType& aValue);
+		void erase(const KeyType& aValue);
 		void erase_at_index(IndexType aIndex);
+		bool try_erase(const KeyType& aValue);
 		void clear();
 		void reserve(size_t aCapacity);
+		
+		void push_back(const KeyType& aValue);
 
 		[[nodiscard]] size_t size() const;
 		[[nodiscard]] bool empty() const;
-		[[nodiscard]] bool contains(const ValueType& aKey) const;
-
-		ValueType* find(const ValueType& aKey);
-		const ValueType* find(const ValueType& aKey) const;
+		[[nodiscard]] bool contains(const KeyType& aKey) const;
 
 	private:
-		std::unordered_map<ValueType, IndexType> myValueToIndex;
-		std::vector<ValueType> myValues;
+		std::unordered_map<KeyType, IndexType> myKeysToIndex;
+		std::vector<KeyType> myKeys;
 	};
 
-	template<typename ValueType, typename IndexType>
-	ValueType& VectorSet<ValueType, IndexType>::at(const IndexType aIndex)
+	template<typename KeyType, typename IndexType>
+	KeyType& VectorSet<KeyType, IndexType>::at(const IndexType aIndex)
 	{
-		return myValues.at(aIndex);
+		return myKeys.at(aIndex);
 	}
 
-	template<typename ValueType, typename IndexType>
-	const ValueType& VectorSet<ValueType, IndexType>::at(const IndexType aIndex) const
+	template<typename KeyType, typename IndexType>
+	const KeyType& VectorSet<KeyType, IndexType>::at(const IndexType aIndex) const
 	{
-		return myValues.at(aIndex);
+		return myKeys.at(aIndex);
 	}
 
-	template<typename ValueType, typename IndexType>
-	ValueType& VectorSet<ValueType, IndexType>::operator[](const IndexType aIndex)
+	template<typename KeyType, typename IndexType>
+	KeyType& VectorSet<KeyType, IndexType>::operator[](const IndexType aIndex)
 	{
-		return myValues[aIndex];
+		return myKeys[aIndex];
 	}
 
-	template<typename ValueType, typename IndexType>
-	const ValueType& VectorSet<ValueType, IndexType>::operator[](const IndexType aIndex) const
+	template<typename KeyType, typename IndexType>
+	const KeyType& VectorSet<KeyType, IndexType>::operator[](const IndexType aIndex) const
 	{
-		return myValues[aIndex];
+		return myKeys[aIndex];
 	}
 
-	template<typename ValueType, typename IndexType>
-	ValueType* VectorSet<ValueType, IndexType>::data()
+	template<typename KeyType, typename IndexType>
+	KeyType* VectorSet<KeyType, IndexType>::data()
 	{
-		return myValues.data();
+		return myKeys.data();
 	}
 
-	template<typename ValueType, typename IndexType>
-	const ValueType* VectorSet<ValueType, IndexType>::data() const
+	template<typename KeyType, typename IndexType>
+	const KeyType* VectorSet<KeyType, IndexType>::data() const
 	{
-		return myValues.data();
+		return myKeys.data();
 	}
 
-	template<typename ValueType, typename IndexType>
-	bool VectorSet<ValueType, IndexType>::insert(const ValueType& aValue)
+	template<typename KeyType, typename IndexType>
+	bool VectorSet<KeyType, IndexType>::insert(const KeyType& aValue)
 	{
-		auto result = myValueToIndex.insert({aValue, 0});
+		auto result = myKeysToIndex.insert({aValue, 0});
 		if (result.second)
 		{
-			result.first->second = myValues.size();
-			myValues.push_back(aValue);
+			result.first->second = myKeys.size();
+			myKeys.push_back(aValue);
 			return true;
 		}
 
 		return false;
 	}
 
-	template<typename ValueType, typename IndexType>
-	void VectorSet<ValueType, IndexType>::erase(const ValueType& aValue)
+	template<typename KeyType, typename IndexType>
+	void VectorSet<KeyType, IndexType>::erase(const KeyType& aValue)
 	{
-		IndexType vectorIndex = myValueToIndex.at(aValue);
+		IndexType vectorIndex = myKeysToIndex.at(aValue);
 		erase_at_index(vectorIndex);
-		/*myValueToIndex.erase(aValue);
-
-		IndexType backIndex = myValues.size() - 1u;
-		if (vectorIndex != backIndex)
-		{
-			myValueToIndex.at(myValues.back()) = backIndex;
-			std::swap(myValues[vectorIndex], myValues[backIndex]);
-		}
-		myValues.pop_back();*/
 	}
 
-	template<typename ValueType, typename IndexType>
-	void VectorSet<ValueType, IndexType>::erase_at_index(IndexType aIndex)
+	template<typename KeyType, typename IndexType>
+	void VectorSet<KeyType, IndexType>::erase_at_index(IndexType aIndex)
 	{
-		IndexType backIndex = myValues.size() - 1u;
+		IndexType backIndex = myKeys.size() - 1u;
 		if (aIndex != backIndex)
 		{
-			myValueToIndex.at(myValues.back()) = backIndex;
-			std::swap(myValues[aIndex], myValues[backIndex]);
+			myKeysToIndex.at(myKeys.back()) = backIndex;
+			std::swap(myKeys[aIndex], myKeys[backIndex]);
 		}
-		myValueToIndex.erase(myValues[aIndex]);
-		myValues.pop_back();
+		myKeysToIndex.erase(myKeys[aIndex]);
+		myKeys.pop_back();
 	}
 
-	template<typename ValueType, typename IndexType>
-	void VectorSet<ValueType, IndexType>::clear()
+	template<typename KeyType, typename IndexType>
+	bool VectorSet<KeyType, IndexType>::try_erase(const KeyType& aValue)
 	{
-		myValues.clear();
-		myValueToIndex.clear();
+		auto it = myKeysToIndex.find(aValue);
+		
+		if (it != myKeysToIndex.end())
+		{
+			erase_at_index(it->second);
+			
+			return true;
+		}
+		
+		return false;
 	}
 
-	template<typename ValueType, typename IndexType>
-	void VectorSet<ValueType, IndexType>::reserve(size_t aCapacity)
+	template<typename KeyType, typename IndexType>
+	void VectorSet<KeyType, IndexType>::clear()
 	{
-		myValues.reserve(aCapacity);
-		myValueToIndex.reserve(aCapacity);
+		myKeys.clear();
+		myKeysToIndex.clear();
 	}
 
-	template<typename ValueType, typename IndexType>
-	size_t VectorSet<ValueType, IndexType>::size() const
+	template<typename KeyType, typename IndexType>
+	void VectorSet<KeyType, IndexType>::reserve(size_t aCapacity)
 	{
-		return myValues.size();
+		myKeys.reserve(aCapacity);
+		myKeysToIndex.reserve(aCapacity);
 	}
 
-	template<typename ValueType, typename IndexType>
-	bool VectorSet<ValueType, IndexType>::empty() const
+	template<typename KeyType, typename IndexType>
+	void VectorSet<KeyType, IndexType>::push_back(const KeyType& aValue)
 	{
-		return myValues.empty();
+		if (myKeysToIndex.insert({aValue, myKeys.size()}).second == false)
+		{
+			LOG_ERROR("%s","Key was pushed back when it already exists");
+			return;
+		}
+		
+		myKeys.push_back(aValue);
 	}
 
-	template<typename ValueType, typename IndexType>
-	bool VectorSet<ValueType, IndexType>::contains(const ValueType& aKey) const
+	template<typename KeyType, typename IndexType>
+	size_t VectorSet<KeyType, IndexType>::size() const
 	{
-		return myValueToIndex.contains(aKey);
+		return myKeys.size();
 	}
 
+	template<typename KeyType, typename IndexType>
+	bool VectorSet<KeyType, IndexType>::empty() const
+	{
+		return myKeys.empty();
+	}
+
+	template<typename KeyType, typename IndexType>
+	bool VectorSet<KeyType, IndexType>::contains(const KeyType& aKey) const
+	{
+		return myKeysToIndex.contains(aKey);
+	}
 }

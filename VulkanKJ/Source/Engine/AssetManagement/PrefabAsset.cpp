@@ -38,9 +38,9 @@ void Wonder::PrefabAsset::Init(const nlohmann::json& aJson)
     for (auto& objectDataJson : objectDataListJson)
     {
         PrefabObjectData data{};
-        LoadProperty(data.transform.translation, objectDataJson, "translation");
-        LoadProperty(data.transform.rotation, objectDataJson, "rotation");
-        LoadProperty(data.transform.scale, objectDataJson, "scale");
+        LoadProperty(data.localTransform.translation, objectDataJson, "translation");
+        LoadProperty(data.localTransform.rotation, objectDataJson, "rotation");
+        LoadProperty(data.localTransform.scale, objectDataJson, "scale");
         data.objectId.id = objectDataJson["objectId"];
         data.parentId.id = objectDataJson["parentId"];
         data.basePrefabId.id = objectDataJson["basePrefabId"];
@@ -52,7 +52,7 @@ void Wonder::PrefabAsset::Init(const nlohmann::json& aJson)
         
         if (data.parentId != NULL_PREFAB_OBJECT)
         {
-            if (myParentToChildrenMap.contains(data.objectId))
+            if (myParentToChildrenMap.contains(data.parentId))
             {
                 myParentToChildrenMap.at(data.parentId).push_back(data.objectId);
             }
@@ -96,9 +96,9 @@ void Wonder::PrefabAsset::SaveToJson(nlohmann::json& aJson,const char* aName)
         nlohmann::json objectDataJson;
         
         PrefabObjectData& data = myPrefabObjects.data()[i];
-        SaveProperty(data.transform.translation, objectDataJson, "translation");
-        SaveProperty(data.transform.rotation, objectDataJson, "rotation");
-        SaveProperty(data.transform.scale, objectDataJson, "scale");
+        SaveProperty(data.localTransform.translation, objectDataJson, "translation");
+        SaveProperty(data.localTransform.rotation, objectDataJson, "rotation");
+        SaveProperty(data.localTransform.scale, objectDataJson, "scale");
         objectDataJson["objectId"] = data.objectId.id;
         objectDataJson["parentId"] = data.parentId.id;
         objectDataJson["basePrefabId"] = data.basePrefabId.id;
@@ -107,6 +107,30 @@ void Wonder::PrefabAsset::SaveToJson(nlohmann::json& aJson,const char* aName)
         saveComponentDatas(data.components, objectDataJson["components"]);
         
         objectDataListJson.emplace_back(objectDataJson);
+    }
+}
+
+void Wonder::PrefabAsset::AdoptPrefab(PrefabObjectId aParent, PrefabId aId)
+{
+    PrefabAsset& adoptedPrefab = GetPrefabRegistry().AccessAssetFromID(aId);
+    
+    PrefabObjectData& copyData = adoptedPrefab.myPrefabObjects.at(adoptedPrefab.GetHeadObjectId());
+    PrefabObjectData newData{};
+    
+    newData.name = copyData.name + "(Adopted)";
+    newData.components = copyData.components;
+    newData.basePrefabId = aId;
+    newData.parentId = aParent;
+    newData.objectId = GeneratePrefabObjectId();
+    
+    myPrefabObjects.emplace(newData.objectId,newData);
+    if (myParentToChildrenMap.contains(newData.parentId))
+    {
+        myParentToChildrenMap.at(newData.parentId).push_back(newData.objectId);
+    }
+    else
+    {
+        myParentToChildrenMap.emplace(newData.parentId,std::vector<PrefabObjectId>{newData.objectId});
     }
 }
 
@@ -153,4 +177,9 @@ const std::unordered_map<Wonder::PrefabObjectId,std::vector<Wonder::PrefabObject
 Wonder::PrefabObjectId Wonder::PrefabAsset::GetHeadObjectId() const
 {
     return myHeadObjectId;
+}
+
+Wonder::PrefabId Wonder::PrefabAsset::GetPrefabId() const
+{
+    return myId;
 }

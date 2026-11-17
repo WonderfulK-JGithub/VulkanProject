@@ -1,27 +1,13 @@
 {
-  "id": 7,
-  "myHeadObject": 8,
+  "id": 20,
+  "myHeadObject": 21,
   "name": "New_Prefab",
   "objectDataList": [
     {
-      "basePrefabId": 7,
-      "components": [
-        {
-          "!type": "Model",
-          "Custom Data": [
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "Is Visible": false,
-          "Material": 219902325555200,
-          "Model": 219902325555202,
-          "allowedOverrides": 0
-        }
-      ],
+      "basePrefabId": 20,
+      "components": null,
       "name": "New_Prefab",
-      "objectId": 8,
+      "objectId": 21,
       "parentId": 0,
       "rotation": [
         0.0,
@@ -40,7 +26,7 @@
       ]
     },
     {
-      "basePrefabId": 7,
+      "basePrefabId": 20,
       "components": [
         {
           "!type": "Model",
@@ -52,13 +38,49 @@
           ],
           "Is Visible": false,
           "Material": 1,
-          "Model": 219902325555203,
+          "Model": 1,
+          "allowedOverrides": 0
+        }
+      ],
+      "name": "Prefab_Child 232323",
+      "objectId": 26,
+      "parentId": 21,
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        2.3499999046325684,
+        2.299999952316284,
+        1.0
+      ],
+      "translation": [
+        -1.850000023841858,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "basePrefabId": 20,
+      "components": [
+        {
+          "!type": "Model",
+          "Custom Data": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Is Visible": false,
+          "Material": 219902325555201,
+          "Model": 1,
           "allowedOverrides": 0
         }
       ],
       "name": "Prefab_Child",
-      "objectId": 9,
-      "parentId": 8,
+      "objectId": 25,
+      "parentId": 21,
       "rotation": [
         0.0,
         0.0,

@@ -35,6 +35,7 @@ namespace ECS
 		bool isParent = false;
 		Wonder::LayerIndex layer{};
 		EntityID parent = INVALID_ENTITY;
+		Wonder::PrefabObjectId prefabObjectId;
 	};
 	
 	struct EntityParentInfo

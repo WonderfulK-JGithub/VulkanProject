@@ -559,6 +559,8 @@ uint8_t Wonder::ImGuiUtil::DisplayDragFloat(const char* label, float* v, const f
 {
 	uint8_t info        = 0;
 	const float initial = *v;
+	
+	globalVectorEditFlags = 0;
 
 	ImGui::DragFloat(label, v, v_speed, v_min, v_max, format, flags);
 	
@@ -573,6 +575,7 @@ uint8_t Wonder::ImGuiUtil::DisplayDragFloat(const char* label, float* v, const f
 	if (initial != *v)
 	{
 		info |= InfoFlag_ChangedValue;
+		globalVectorEditFlags = VectorEditFlags_X;
 	}
 
 	return info;
@@ -598,6 +601,7 @@ uint8_t Wonder::ImGuiUtil::DisplayDragFloat2(const char* label, float* v, const 
 	const ImGuiSliderFlags flags,
 	const char* aFormat)
 {
+	globalVectorEditFlags = 0;
 	uint8_t info        = 0;
 	const float initial[2] = { v[0], v[1] };
 	ImGui::DragFloat2(label, v, v_speed, v_min, v_max, aFormat, flags);
@@ -610,10 +614,15 @@ uint8_t Wonder::ImGuiUtil::DisplayDragFloat2(const char* label, float* v, const 
 	{
 		info |= InfoFlag_Editing;
 	}
-	if (initial[0] != v[0] || initial[1] != v[1])
+	for (uint32_t i = 0; i < 2; ++i)
 	{
-		info |= InfoFlag_ChangedValue;
+		if (initial[i] != v[i])
+		{
+			info |= InfoFlag_ChangedValue;
+			globalVectorEditFlags |= BIT(i);
+		}
 	}
+	
 
 	return info;
 }
@@ -622,6 +631,7 @@ uint8_t Wonder::ImGuiUtil::DisplayDragFloat3(const char* label, float* v, const 
 	const ImGuiSliderFlags flags,
 	const char* format)
 {
+	globalVectorEditFlags = 0;
 	uint8_t info           = 0;
 	const float initial[3] = {v[0], v[1], v[2]};
 	
@@ -635,9 +645,13 @@ uint8_t Wonder::ImGuiUtil::DisplayDragFloat3(const char* label, float* v, const 
 	{
 		info |= InfoFlag_Editing;
 	}
-	if (initial[0] != v[0] || initial[1] != v[1] || initial[2] != v[2])
+	for (uint32_t i = 0; i < 3; ++i)
 	{
-		info |= InfoFlag_ChangedValue;
+		if (initial[i] != v[i])
+		{
+			info |= InfoFlag_ChangedValue;
+			globalVectorEditFlags |= BIT(i);
+		}
 	}
 
 	return info;
@@ -645,6 +659,7 @@ uint8_t Wonder::ImGuiUtil::DisplayDragFloat3(const char* label, float* v, const 
 
 uint8_t Wonder::ImGuiUtil::DisplayDragFloat4(const char* label, float* v, const float v_speed, const float v_min, const float v_max, const ImGuiSliderFlags flags, const char* format)
 {
+	globalVectorEditFlags = 0;
 	uint8_t info           = 0;
 	const float initial[4] = { v[0], v[1], v[2], v[3] };
 	ImGui::DragFloat4(label, v, v_speed, v_min, v_max, format, flags);
@@ -657,9 +672,13 @@ uint8_t Wonder::ImGuiUtil::DisplayDragFloat4(const char* label, float* v, const 
 	{
 		info |= InfoFlag_Editing;
 	}
-	if (initial[0] != v[0] || initial[1] != v[1] || initial[2] != v[2] || initial[3] != v[3])
+	for (uint32_t i = 0; i < 4; ++i)
 	{
-		info |= InfoFlag_ChangedValue;
+		if (initial[i] != v[i])
+		{
+			info |= InfoFlag_ChangedValue;
+			globalVectorEditFlags |= BIT(i);
+		}
 	}
 
 	return info;

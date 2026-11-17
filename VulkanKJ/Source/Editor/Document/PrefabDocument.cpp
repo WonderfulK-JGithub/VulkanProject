@@ -12,6 +12,8 @@
 #include <ECS/Reflection/ComponentType.h>
 #include <ID/IdFunctions.h>
 #include <Input/KeyboardInput.h>
+#include <Math/Color.h>
+#include <Util/ImGuiColor.h>
 
 #include "EditorGlobals.h"
 
@@ -42,9 +44,6 @@ void Wonder::PrefabDocument::Init(const Filepath& aFilePath)
 	
 	ECS::ECSScope scope{&myEcs};
 	ECS::Instantiate(myEditPrefab,{},myPrefabHeadEntityId);
-	
-	mySelection.headEntityId = myPrefabHeadEntityId;
-	mySelection.prefabObjectId = myEditPrefab.GetHeadObjectId();
 }
 
 void Wonder::PrefabDocument::Update([[maybe_unused]] float aDeltaTime)
@@ -58,11 +57,12 @@ void Wonder::PrefabDocument::Update([[maybe_unused]] float aDeltaTime)
 	
 	ECS::ECSScope ecsScope{&myEcs};
 	
+	myClearSelectionOnClick = (ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeyShift) == false;
+	
 	myCameraController.Update();
 	myLineGrid.MakeLines(glm::xyz(myCameraController.GetTransform()[3]),10);
 	
 	ImGui::Begin(myPanelNames[static_cast<uint32_t>(PanelNames::Viewport)].c_str(),nullptr,myWindowFlags);
-	
 	SetPanelInfo(myPanelInfos[static_cast<uint32_t>(PanelNames::Viewport)]);
         
 	myEditorViewport.ResizeCheck();
@@ -73,11 +73,15 @@ void Wonder::PrefabDocument::Update([[maybe_unused]] float aDeltaTime)
 	ImGui::End();
     	
 	ImGui::Begin(myPanelNames[static_cast<uint32_t>(PanelNames::Hierarchy)].c_str(),nullptr,myWindowFlags);
+	SetPanelInfo(myPanelInfos[static_cast<uint32_t>(PanelNames::Hierarchy)]);
 	DisplayHierarchy();
 	ImGui::End();
     	
 	ImGui::Begin(myPanelNames[static_cast<uint32_t>(PanelNames::Properties)].c_str(),nullptr,myWindowFlags);
-	DisplayProperties();
+	SetPanelInfo(myPanelInfos[static_cast<uint32_t>(PanelNames::Properties)]);
+	DisplayNameEdit();
+	DisplayTRSEdit();
+	DisplayComponents();
 	DisplayAddComponent();
 	ImGui::End();
 	
@@ -91,6 +95,62 @@ void Wonder::PrefabDocument::Update([[maybe_unused]] float aDeltaTime)
 		{
 			myCommandManager.Undo();
 		}
+	}
+	
+	if (KeyboardInput::IsKeyPressed(KeyboardInput::Keycode::Delete))
+	{
+		auto& prefabObjects = myEditPrefab.AccessPrefabObjects();
+		auto& parentMap = myEditPrefab.AccessParentToChildrenMap();
+		
+		auto& topSelection = mySelection.GetTopObjects();
+		
+		if (topSelection.contains({.headEntityId = myPrefabHeadEntityId,.prefabObjectId = myEditPrefab.GetHeadObjectId()}) == false)
+		{
+			std::vector<PrefabObjectId> childrenToDelete;
+			for (uint32_t i = 0; i < topSelection.size(); ++i)
+			{
+				PrefabObjectId toDelete = topSelection[i].prefabObjectId;
+				
+				auto& parentChildren = parentMap.at(prefabObjects.at(toDelete).parentId);
+				parentChildren.erase(std::ranges::find(parentChildren,toDelete));
+				
+				auto it = parentMap.find(toDelete);
+				
+				if (it != parentMap.end())
+				{
+					childrenToDelete = it->second;
+					parentMap.erase(toDelete);
+					prefabObjects.erase(topSelection[i].prefabObjectId);
+				}
+				
+				prefabObjects.erase(toDelete);
+			}
+
+			while (childrenToDelete.empty() == false)
+			{
+				PrefabObjectId toDelete = childrenToDelete.back();
+				childrenToDelete.pop_back();
+				
+				auto it = parentMap.find(toDelete);
+				
+				if (it != parentMap.end())
+				{
+					for (auto& childId : it->second)
+					{
+						childrenToDelete.push_back(childId);
+					}
+					
+					parentMap.erase(toDelete);
+				}
+				
+				prefabObjects.erase(toDelete);
+			}
+			
+			mySelection.ClearSelection();
+			
+			MakeUpdateCommand();
+		}
+		
 	}
 }
 
@@ -161,48 +221,86 @@ void Wonder::PrefabDocument::GenerateSubDocks()
 
 void Wonder::PrefabDocument::DisplayHierarchy()
 {
+	myAnyHierarchyObjectHovered = false;
 	DisplayHierarchyObject(myEditPrefab.GetHeadObjectId());
+	
+	if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && myAnyHierarchyObjectHovered == false && myClearSelectionOnClick &&
+		(myPanelInfos[static_cast<int>(PanelNames::Hierarchy)] & PanelFlag_Hovered) != 0u)
+	{
+		mySelection.ClearSelection();
+	}
 }
 
 void Wonder::PrefabDocument::DisplayHierarchyObject(PrefabObjectId aPrefabObjectId)
 {
 	ECS::EntityReference reference{myPrefabHeadEntityId,aPrefabObjectId};
+	PrefabObjectData& prefabObject = myEditPrefab.AccessPrefabObjects().at(reference.prefabObjectId);
+	
+	bool isOtherPrefab = prefabObject.basePrefabId != myId;
+	auto it = myEditPrefab.AccessParentToChildrenMap().find(aPrefabObjectId);
+	bool hasChildren = it != myEditPrefab.AccessParentToChildrenMap().end();
 	
 	int treeNodeFlags = ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
 	
-	if (reference == mySelection)
+	if (mySelection.Contains(reference))
 	{
 		treeNodeFlags |= ImGuiTreeNodeFlags_Selected;
 	}
 	
-	PrefabObjectData& prefabObject = myEditPrefab.AccessPrefabObjects().at(reference.prefabObjectId);
+	if (hasChildren == false || isOtherPrefab)
+	{
+		treeNodeFlags |= ImGuiTreeNodeFlags_Leaf;
+	}
+	
+	ImGuiUtil::IdScope idScope{&prefabObject};
 	
 	char stringBuffer[256];
+	
+	ImGuiUtil::ColorScope colorScope{ImGuiCol_Text,ImGuiUtil::CYAN_IM_COLOR,isOtherPrefab};
 	
 	if (aPrefabObjectId == myEditPrefab.GetHeadObjectId())
 	{
 		sprintf_s(stringBuffer, ICON_LC_CROWN " %s", prefabObject.name.c_str());
+	}
+	else if (isOtherPrefab)
+	{
+		sprintf_s(stringBuffer, ICON_LC_BOX " %s", prefabObject.name.c_str());
 	}
 	else
 	{
 		sprintf_s(stringBuffer, ICON_LC_SMILE " %s", prefabObject.name.c_str());
 	}
 	
-	ImGui::PushID(stringBuffer);
-	
 	bool open = ImGui::TreeNodeEx(stringBuffer, treeNodeFlags);
+	
+	bool hovered = ImGui::IsItemHovered();
+	myAnyHierarchyObjectHovered |= hovered;
 	
 	if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
 	{
-		mySelection = reference;
-		LOG_INFO("%ull selected",mySelection.prefabObjectId.id);
+		if (myClearSelectionOnClick)
+		{
+			mySelection.ClearSelection();
+		}
+		mySelection.AddToSelection(reference);
+		LOG_DEBUG("%ull selected",reference.prefabObjectId.id);
 	}
+	
+	if (isOtherPrefab)
+	{
+		if (open)
+		{
+			ImGui::TreePop();
+		}
+		return;
+	}
+	
+	
+	HierarchyDropTarget(aPrefabObjectId);
 	
 	if (open)
 	{
-		auto it = myEditPrefab.AccessParentToChildrenMap().find(aPrefabObjectId);
-		
-		if (it != myEditPrefab.AccessParentToChildrenMap().end())
+		if (hasChildren)
 		{
 			for (auto& childId : it->second)
 			{
@@ -213,7 +311,12 @@ void Wonder::PrefabDocument::DisplayHierarchyObject(PrefabObjectId aPrefabObject
 		ImGui::TreePop();
 	}
 	
-	if (ImGui::BeginPopupContextItem())
+	if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+	{
+		ImGui::OpenPopup("HierarchyPopup");
+	}
+	
+	if (ImGui::BeginPopup("HierarchyPopup"))
 	{
 		if (ImGui::Button("Create Child" ICON_LC_SMILE_PLUS))
 		{
@@ -224,8 +327,6 @@ void Wonder::PrefabDocument::DisplayHierarchyObject(PrefabObjectId aPrefabObject
 			childObject.parentId = aPrefabObjectId;
     
 			myEditPrefab.AccessPrefabObjects().emplace(childObject.objectId,childObject);
-			
-			auto it = myEditPrefab.AccessParentToChildrenMap().find(aPrefabObjectId);
 			
 			if (it != myEditPrefab.AccessParentToChildrenMap().end())
 			{
@@ -241,22 +342,187 @@ void Wonder::PrefabDocument::DisplayHierarchyObject(PrefabObjectId aPrefabObject
 		
 		ImGui::EndPopup();
 	}
-	
-	ImGui::PopID();
 }
 
-void Wonder::PrefabDocument::DisplayProperties()
+void Wonder::PrefabDocument::HierarchyDropTarget(PrefabObjectId aPrefabObjectId)
 {
-	PrefabObjectData& selectedPrefabObject = myEditPrefab.AccessPrefabObjects().at(mySelection.prefabObjectId);
-    auto& componentDatas = selectedPrefabObject.components;
+	if (ImGui::BeginDragDropTarget())
+	{
+		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(PREFAB_FILE_EXTENSION);
+		
+		if (payload != nullptr)
+		{
+			const FilePath filePath = static_cast<char*>(payload->Data);
+			const std::string name = filePath.filename().replace_extension().string();
+			PrefabId prefabId = GetPrefabRegistry().GetIDFromName(name.c_str());
+			
+			if (prefabId == myId)
+			{
+				LOG_WARNING("%s","Tried do add prefab to itself!");
+			}
+			else
+			{
+				myEditPrefab.AdoptPrefab(aPrefabObjectId,prefabId);
+			
+				MakeUpdateCommand();
+			}
+		}
+		
+		ImGui::EndDragDropTarget();
+	}
+}
+
+void Wonder::PrefabDocument::DisplayNameEdit()
+{
+	if (mySelection.IsEmpty())
+	{
+		return;
+	}
+	
+	auto& selectionList = mySelection.GetSelection();
+	if (selectionList.size() > 1)
+	{
+		ImGuiUtil::ThickSeparator(3.f);
+		ImGui::TextUnformatted("[Multi Select]");
+		ImGuiUtil::ThickSeparator(3.f);
+		return;
+	}
+	
+	auto& selectedObject = myEditPrefab.AccessPrefabObjects().at(selectionList[0].prefabObjectId);
+	
+	ImGui::BeginDisabled(selectedObject.objectId == myEditPrefab.GetHeadObjectId());
+	
+	ImGui::TextUnformatted("Name");
+	ImGui::SameLine();
+	ImGuiUtil::DisplayTextInput("##name",selectedObject.name);
+	
+	ImGui::EndDisabled();
+}
+
+void Wonder::PrefabDocument::DisplayTRSEdit()
+{
+	if (mySelection.IsEmpty())
+	{
+		return;
+	}
+	
+	auto& selectionList = mySelection.GetSelection();
+	PrefabObjectData& firstSelectedPrefabObject = myEditPrefab.AccessPrefabObjects().at(selectionList[0].prefabObjectId);
+	
+	auto& trs = firstSelectedPrefabObject.localTransform;
+	
+	uint8_t info = 0;
+	if (ImGuiUtil::PropertyTable::PropertyHeader("Transform"))
+	{
+		Goose::TransformTRS startTrs = trs;
+		
+		ImGui::TextUnformatted("Position");
+		ImGui::SameLine();
+		info |= ImGuiUtil::DisplayDragFloat3("##pos",&trs.translation.x,0.05f);
+
+		for (uint32_t i = 0; i < 3; ++i)
+		{
+			if (ImGuiUtil::globalVectorEditFlags & Flags<ImGuiUtil::VectorEditFlags>{BIT(i)})
+			{
+				for (uint32_t j = 0; j < selectionList.size(); ++j)
+				{
+					PrefabObjectData& prefabObject = myEditPrefab.AccessPrefabObjects().at(selectionList[j].prefabObjectId);
+					(&prefabObject.localTransform.translation.x)[i] = (&trs.translation.x)[i];
+				}
+				
+				break;
+			}
+		}
+		
+		ImGui::TextUnformatted("Rotation");
+		ImGui::SameLine();
+		info |= ImGuiUtil::DisplayDragFloat3("##rot",&trs.rotation.x);
+		
+		for (uint32_t i = 0; i < 3; ++i)
+		{
+			if (ImGuiUtil::globalVectorEditFlags & Flags<ImGuiUtil::VectorEditFlags>{BIT(i)})
+			{
+				for (uint32_t j = 0; j < selectionList.size(); ++j)
+				{
+					PrefabObjectData& prefabObject = myEditPrefab.AccessPrefabObjects().at(selectionList[j].prefabObjectId);
+					(&prefabObject.localTransform.rotation.x)[i] = (&trs.rotation.x)[i];
+				}
+				
+				break;
+			}
+		}
+		
+		ImGui::TextUnformatted("Scale");
+		ImGui::SameLine();
+		info |= ImGuiUtil::DisplayDragFloat3("##scale",&trs.scale.x,0.01f,0.01f,69420.f);
+		
+		for (uint32_t i = 0; i < 3; ++i)
+		{
+			if (ImGuiUtil::globalVectorEditFlags & Flags<ImGuiUtil::VectorEditFlags>{BIT(i)})
+			{
+				for (uint32_t j = 0; j < selectionList.size(); ++j)
+				{
+					PrefabObjectData& prefabObject = myEditPrefab.AccessPrefabObjects().at(selectionList[j].prefabObjectId);
+					(&prefabObject.localTransform.scale.x)[i] = (&trs.scale.x)[i];
+				}
+				
+				break;
+			}
+		}
+		
+		if ((info & InfoFlag_ChangedValue) != 0u)
+		{
+			for (uint32_t i = 0; i < selectionList.size(); ++i)
+			{
+				ECS::Entity entity = ECS::GetEntityFromReference(selectionList[i]);
+				Goose::TransformComponent& transform = *entity.GetTransform();
+			
+				transform = myEditPrefab.AccessPrefabObjects().at(selectionList[i].prefabObjectId).localTransform;
+			
+				if (entity.GetID() != myPrefabHeadEntityId)
+				{
+					glm::mat4x4 parentTransform = *ECS::Entity(entity.GetParentId()).GetTransform();
+					transform = parentTransform * glm::mat4x4(transform);
+				}
+			
+				ECS::Entity::ParentUpdate(entity.GetID());
+			}
+		}
+		
+		if ((info & InfoFlag_EditEnded) != 0u)
+		{
+			MakeUpdateCommand();
+		}
+	}
+}
+
+void Wonder::PrefabDocument::DisplayComponents()
+{
+	if (mySelection.IsEmpty())
+	{
+		return;
+	}
+	
+	auto& selectionList = mySelection.GetSelection();
+	auto& prefabObjects = myEditPrefab.AccessPrefabObjects();
+	
+	bool isMultiSelect = selectionList.size() > 1;
+	
+    myDisplayedComponents = prefabObjects.at(selectionList[0].prefabObjectId).components;
 
     Reflection::globalReflectionMode = Reflection::ReflectionMode::Display;
-    Reflection::globalCurrentReflectedId = ECS::GetEntityFromReference(mySelection).GetID();
+    Reflection::globalCurrentReflectedId = isMultiSelect ? ECS::INVALID_ENTITY : ECS::GetEntityFromReference(selectionList[0]).GetID();
 
-    for (int componentIndex = 0; componentIndex < static_cast<int>(componentDatas.size()); ++componentIndex)
+	uint8_t info = 0;
+	
+	const ComponentTypeBase* typeToRemove = nullptr;
+	int changedComponentIndex = -1; 
+	uint64_t changeFlag = 0;
+	
+    for (int componentIndex = 0; componentIndex < static_cast<int>(myDisplayedComponents.size()); ++componentIndex)
     {
-        const Wonder::ComponentTypeBase* type = componentDatas.at(componentIndex).GetType();
-        char* data                      = componentDatas.at(componentIndex).AccessData();
+        const Wonder::ComponentTypeBase* type = myDisplayedComponents.at(componentIndex).GetType();
+        char* data                      = myDisplayedComponents.at(componentIndex).AccessData();
 
         ImGui::PushID(componentIndex);
 
@@ -270,17 +536,15 @@ void Wonder::PrefabDocument::DisplayProperties()
         const bool open = ImGuiUtil::PropertyTable::PropertyHeader(type->GetName());
         if (removed)
         {
-            componentDatas.erase(componentDatas.begin() + componentIndex);
-        	MakeUpdateCommand();
-
-            ImGui::PopID();
+        	typeToRemove = type;
+			ImGui::PopID();
             break;
         }
 
         if (open)
         {
             Reflection::globalInfoFlag             = 0;
-            Reflection::globalAllowedOverridesFlag = componentDatas[componentIndex].GetOverridesFlag();
+            Reflection::globalAllowedOverridesFlag = myDisplayedComponents[componentIndex].GetOverridesFlag();
             Reflection::globalOverridesEditFlag    = 0;
             Reflection::globalEditType             = Reflection::EditType::Prefab;
 
@@ -288,25 +552,111 @@ void Wonder::PrefabDocument::DisplayProperties()
             type->ReflectComponent(data);
             ImGuiUtil::PropertyTable::EndPropertyTable();
 
-            componentDatas[componentIndex].AccessOverridesFlag() = Reflection::globalAllowedOverridesFlag;
+            myDisplayedComponents[componentIndex].AccessOverridesFlag() = Reflection::globalAllowedOverridesFlag;
 
-            if ((Reflection::globalInfoFlag & Wonder::InfoFlag_EditEnded) != 0)
-            {
-                LOG_INFO("Updated property %s",type->GetName());
-                MakeUpdateCommand();
-            }
-            else if ((Reflection::globalInfoFlag & Wonder::InfoFlag_ChangedValue) != 0)
-            {
-                type->SetComponentData(ECS::Entity(myPrefabHeadEntityId), data);
-            }
+        	info |= Reflection::globalInfoFlag;
+        	
+        	if ((Reflection::globalInfoFlag & Wonder::InfoFlag_ChangedValue) != 0)
+        	{
+        		changedComponentIndex = componentIndex;
+        		changeFlag = Reflection::globalOverridesEditFlag;
+        	}
         }
 
         ImGui::PopID();
     }
+	
+	if (typeToRemove != nullptr)
+	{
+		for (uint32_t selectionIndex  = 0; selectionIndex < selectionList.size(); ++selectionIndex)
+		{
+			PrefabObjectData& selectedPrefabObject = prefabObjects.at(selectionList[selectionIndex].prefabObjectId);
+				
+			if (selectedPrefabObject.basePrefabId != myId)
+			{
+				continue;
+			}
+
+			for (uint32_t i = 0; i < selectedPrefabObject.components.size(); ++i)
+			{
+				if (selectedPrefabObject.components[i].GetType() == typeToRemove)
+				{
+					selectedPrefabObject.components.erase(selectedPrefabObject.components.begin() + i);
+					break;
+				}
+			}
+		}
+		
+		MakeUpdateCommand();
+	}
+	
+	
+	if (changedComponentIndex != -1)
+	{
+		const ComponentTypeBase* typeToUpdate = myDisplayedComponents[changedComponentIndex].GetType();
+		
+		Reflection::globalOverridesEditFlag = changeFlag;
+		Reflection::globalAllowedOverridesFlag |= std::numeric_limits<uint64_t>::max();
+		
+		Reflection::globalReflectionMode = Reflection::ReflectionMode::OverrideMerge;
+		Reflection::globalPropertyIndex = 0u;
+		
+		Reflection::globalOverrideData = myDisplayedComponents[changedComponentIndex].AccessData();
+		
+		for (uint32_t selectionIndex  = 0; selectionIndex < selectionList.size(); ++selectionIndex)
+		{
+			PrefabObjectData& selectedPrefabObject = prefabObjects.at(selectionList[selectionIndex].prefabObjectId);
+				
+			if (selectedPrefabObject.basePrefabId != myId)
+			{
+				continue;
+			}
+
+			for (uint32_t i = 0; i < selectedPrefabObject.components.size(); ++i)
+			{
+				if (selectedPrefabObject.components[i].GetType() == typeToUpdate)
+				{
+					ComponentData& componentToUpdate = selectedPrefabObject.components[i];
+					
+					Reflection::globalPrefabData = componentToUpdate.AccessData();
+					Reflection::globalDataStartAddress = componentToUpdate.AccessData();
+					
+					typeToUpdate->ReflectComponent(componentToUpdate.AccessData());
+					
+					typeToUpdate->SetComponentData(ECS::GetEntityFromReference(selectionList[selectionIndex]), componentToUpdate.AccessData());
+					break;
+				}
+			}
+		}
+		
+	}
+	
+	if ((info & Wonder::InfoFlag_EditEnded) != 0)
+	{
+		MakeUpdateCommand();
+	}
 }
 
 void Wonder::PrefabDocument::DisplayAddComponent()
 {
+	auto& selectionList = mySelection.GetSelection();
+	auto& prefabObjects = myEditPrefab.AccessPrefabObjects();
+	
+	bool hasSelectedNonAdopted = false;
+	for (uint32_t i  = 0; i < selectionList.size(); ++i)
+	{
+		if (prefabObjects.at(selectionList[i].prefabObjectId).basePrefabId == myId)
+		{
+			hasSelectedNonAdopted = true;
+			break;
+		}
+	}
+	
+	if (hasSelectedNonAdopted == false)
+	{
+		return;
+	}
+	
     static Tga::StringId locSelectedNewComponent;
 	constexpr const char* componentPopupName = "Component_Popup";
 
@@ -365,31 +715,40 @@ void Wonder::PrefabDocument::DisplayAddComponent()
 
 		ImGui::Separator();
 
-		if (ImGui::Button("Create", ImVec2(120, 0)))
+		if (ImGui::Button("Add", ImVec2(120, 0)))
 		{
 			const ComponentTypeBase* newType = Wonder::GetComponentType(locSelectedNewComponent);
 
-			PrefabObjectData& selectedPrefabObject = myEditPrefab.AccessPrefabObjects().at(mySelection.prefabObjectId);
-			auto& componentDatas = selectedPrefabObject.components;
-			
-			bool alreadyExists = false;
-			for (const auto& existingComponentData : componentDatas)
+			for (uint32_t i  = 0; i < selectionList.size(); ++i)
 			{
-				if (existingComponentData.GetType()->GetNameStringID() == newType->GetNameStringID())
+				PrefabObjectData& selectedPrefabObject = prefabObjects.at(selectionList[i].prefabObjectId);
+				
+				if (selectedPrefabObject.basePrefabId != myId)
 				{
-					alreadyExists = true;
-					break;
+					continue;
 				}
-			}
+				
+				auto& componentDatas = selectedPrefabObject.components;
+			
+				bool alreadyExists = false;
+				for (const auto& existingComponentData : componentDatas)
+				{
+					if (existingComponentData.GetType()->GetNameStringID() == newType->GetNameStringID())
+					{
+						alreadyExists = true;
+						break;
+					}
+				}
 
-			if (alreadyExists == false)
-			{
-				componentDatas.emplace_back(newType);
-				MakeUpdateCommand();
-			}
-			else
-			{
-				LOG_WARNING("Component of type %s already exists!",newType->GetName());
+				if (alreadyExists == false)
+				{
+					componentDatas.emplace_back(newType);
+					MakeUpdateCommand();
+				}
+				else
+				{
+					LOG_WARNING("Component of type %s already exists on object %s!",newType->GetName(),selectedPrefabObject.name.c_str());
+				}
 			}
 
 			ImGui::CloseCurrentPopup();

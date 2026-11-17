@@ -76,6 +76,7 @@ namespace ECS
 		void SetLayer(Wonder::LayerIndex aLayer);
 
 		Wonder::LayerIndex GetLayer() const;
+		Wonder::PrefabObjectId GetPrefabObjectId() const; 
 
 		const char* GetName() const;
 
@@ -84,7 +85,7 @@ namespace ECS
 		static void FlushFutures();
 
 		static void CreateFutureArray(ComponentID aID, size_t aSize);
-
+		static void ParentUpdate(const EntityID aParentEntity);
 	private:
 		EntityID myEntityID;
 
@@ -93,14 +94,16 @@ namespace ECS
 
 		static void MoveComponentData(EntityID aEntityID, Archetype* oldArchetype, Archetype* newArchetype, const std::set<ComponentID>& aComponentIDsToMove);
 
-		static void ParentUpdate(const EntityID aParentEntity);
+		
 		
 		static void FlushFutureComponents();
 		static void FlushFutureRemovedComponents();
 	};
 
-	Entity CreateEntity(bool aIsStatic = false, Wonder::LayerIndex aLayer = 0, std::string_view aName = "Undefined");
-	Entity CreateEntity(bool aIsStatic, Wonder::LayerIndex aLayer, EntityID aID, std::string_view aName = "Undefined");
+	Entity CreateEntity(bool aIsStatic = false, Wonder::LayerIndex aLayer = 0,Wonder::PrefabObjectId aPrefabObjectId = Wonder::NULL_PREFAB_OBJECT,
+		std::string_view aName = "Undefined");
+	Entity CreateEntity(bool aIsStatic, Wonder::LayerIndex aLayer, EntityID aID,
+		Wonder::PrefabObjectId aPrefabObjectId = Wonder::NULL_PREFAB_OBJECT,std::string_view aName = "Undefined");
 	void DeleteEntityFast(EntityID aEntity);
 	void DeleteEntity(Entity aEntity);
 	void DeleteEntity(EntityID aEntity);

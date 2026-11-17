@@ -22,11 +22,23 @@ namespace Tga
 	class StringId;
 }
 
+
+
 struct ImVec2;
 using FilePath = std::filesystem::path;
 
 namespace Wonder::ImGuiUtil
 {
+	enum VectorEditFlags
+	{
+		VectorEditFlags_X = BIT(0),
+		VectorEditFlags_Y = BIT(1),
+		VectorEditFlags_Z = BIT(2),
+		VectorEditFlags_W = BIT(3),
+	};
+	
+	inline Flags<VectorEditFlags> globalVectorEditFlags{};
+	
 	struct IdScope
 	{
 		IdScope(const char* aId)
@@ -53,6 +65,34 @@ namespace Wonder::ImGuiUtil
 		{
 			ImGui::PopID();
 		}
+	};
+	
+	struct ColorScope
+	{
+		ColorScope(ImGuiCol aType,ImVec4 aColor)
+		{
+			ImGui::PushStyleColor(aType,aColor);
+		}
+		
+		ColorScope(ImGuiCol aType,ImVec4 aColor,bool aUse)
+		{
+			use = aUse;
+			
+			if (aUse)
+			{
+				ImGui::PushStyleColor(aType,aColor);
+			}
+		}
+		
+		~ColorScope()
+		{
+			if (use)
+			{
+				ImGui::PopStyleColor();
+			}
+		}
+		
+		bool use = true;
 	};
 
 	struct IndentScope

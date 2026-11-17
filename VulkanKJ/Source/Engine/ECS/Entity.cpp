@@ -128,6 +128,11 @@ namespace ECS
         return GetEntityRecord(myEntityID).layer;
     }
 
+    Wonder::PrefabObjectId Entity::GetPrefabObjectId() const
+    {
+        return GetEntityRecord(myEntityID).prefabObjectId;
+    }
+
     // Goose::TransformComponent* Entity::GetTransform()
     // {
     //     return const_cast<Goose::TransformComponent*>(const_cast<const Entity*>(this)->GetTransform());
@@ -160,12 +165,13 @@ namespace ECS
         return myEntityID == aEntity.myEntityID;
     }
 
-    Entity CreateEntity(const bool aIsStatic, const Wonder::LayerIndex aLayer, const std::string_view aName)
+    Entity CreateEntity(const bool aIsStatic, const Wonder::LayerIndex aLayer,Wonder::PrefabObjectId aPrefabObjectId, const std::string_view aName)
     {
-    	return CreateEntity(aIsStatic, aLayer, Internal::globalNextFreeEntityID++, aName);
+    	return CreateEntity(aIsStatic, aLayer, Internal::globalNextFreeEntityID++,aPrefabObjectId, aName);
     }
 
-    Entity CreateEntity(const bool aIsStatic, const Wonder::LayerIndex aLayer, const EntityID aID, const std::string_view aName)
+    Entity CreateEntity(const bool aIsStatic, const Wonder::LayerIndex aLayer, const EntityID aID,
+        Wonder::PrefabObjectId aPrefabObjectId,const std::string_view aName)
     {
         ComponentID transformID = ECS::GetComponentID<Goose::TransformComponent>();
         Archetype& archetype = globalCurrentECS->archetypeManager.GetArchetype(std::set{ transformID });
@@ -181,7 +187,8 @@ namespace ECS
             .isActive = true,
             .isParent = false,
             .layer = aLayer,
-            .parent = INVALID_ENTITY
+            .parent = INVALID_ENTITY,
+            .prefabObjectId = aPrefabObjectId
         });
 
         if (archetype.entityCount >= archetype.capacity)
@@ -329,18 +336,9 @@ namespace ECS
             }
             else
             {
-                if (parentEntityRecord.parent == INVALID_ENTITY)
-                {
-                    globalCurrentECS->topParents.emplace_back(aChild);
-                }
-                
                 globalCurrentECS->parents.emplace(aNewParent, EntityParentInfo{.children = std::vector{aChild}, 
                     .lastTransform = *Entity(aNewParent).GetComponent<Goose::TransformComponent>()});
             }
-        }
-        else if (childEntityRecord.isParent)
-        {
-            globalCurrentECS->topParents.emplace_back(aChild);
         }
     }
 
@@ -385,16 +383,20 @@ namespace ECS
         {
             return;
         }
+        
+        Goose::TransformComponent& parentTransform = *Entity(aParentEntityId).GetTransform();
 
-        const glm::mat4x4 parentTransformation = glm::inverse(glm::mat4x4(it->second.lastTransform)) * glm::mat4x4(*Entity(aParentEntityId).GetTransform());
+        const glm::mat4x4 parentTransformation = glm::mat4x4(parentTransform) * glm::inverse(glm::mat4x4(it->second.lastTransform));
         
         for (auto& childId : it->second.children)
         {
             Goose::TransformComponent& childTransform = *Entity(childId).GetTransform();
-            childTransform = glm::mat4x4(childTransform) * parentTransformation;
+            childTransform = parentTransformation * glm::mat4x4(childTransform);
             
             ParentUpdate(childId);
         }
+        
+        it->second.lastTransform = parentTransform;
     }
 
     void Entity::FlushFutureComponents()

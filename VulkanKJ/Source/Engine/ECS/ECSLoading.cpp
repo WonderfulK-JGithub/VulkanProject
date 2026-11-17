@@ -17,21 +17,31 @@ namespace ECS
 
         for (auto& childObjectId : children)
         {
-            const Wonder::PrefabObjectData& childObjectData = prefabObjects.at(childObjectId);
-            
             const bool isStatic            = false;
             const Wonder::LayerIndex layer = 0;
 
-            const EntityID childEntityId = ECS::CreateEntity(isStatic, layer).GetID();
-            globalCurrentECS->referenceToIdMap.emplace(ECS::EntityReference{.headEntityId = aHeadEntityId,.prefabObjectId = childObjectId},childEntityId);
+            const EntityID childEntityId = ECS::CreateEntity(isStatic, layer,childObjectId).GetID();
+            globalCurrentECS->referenceToIdMap.insert_or_assign(ECS::EntityReference{.headEntityId = aHeadEntityId,.prefabObjectId = childObjectId},childEntityId);
             AssignParentToEntity(childEntityId,aParentEntityID);
             
-            const glm::mat4x4 childTransform = aTransform * glm::mat4x4(Goose::TransformComponent(childObjectData.transform));
+            const Wonder::PrefabObjectData& childObjectData = prefabObjects.at(childObjectId);
+            
+            const glm::mat4x4 childTransform = aTransform * glm::mat4x4(Goose::TransformComponent(childObjectData.localTransform));
             *ECS::Entity(childEntityId).GetTransform() = childTransform;
             
             for (const Wonder::ComponentData& componentData : childObjectData.components)
             {
                 componentData.GetType()->OnGameComponentCreate(ECS::Entity(childEntityId), componentData.AccessData());
+            }
+            
+            if (childObjectData.basePrefabId != aPrefab.GetPrefabId())
+            {
+                Wonder::PrefabAsset& otherPrefab = Wonder::GetPrefabRegistry().AccessAssetFromID(childObjectData.basePrefabId);
+                
+                if (otherPrefab.GetPrefabObjects().size() > 1)
+                {
+                    InstantiateChildren(otherPrefab,childEntityId,childTransform,childEntityId,childObjectId);
+                }
             }
             
             if (parentToChildMap.contains(childObjectId))
@@ -61,7 +71,7 @@ namespace ECS
         const bool isStatic            = false;
         const Wonder::LayerIndex layer = 0;
 
-        ECS::CreateEntity(isStatic, layer,aHeadEntityId).GetID();
+        ECS::CreateEntity(isStatic, layer,aHeadEntityId,aPrefab.GetHeadObjectId()).GetID();
         
         {
             *ECS::Entity(aHeadEntityId).GetTransform() = aTransform;

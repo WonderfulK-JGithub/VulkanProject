@@ -27,7 +27,7 @@ namespace Goose
         TransformComponent(const TransformTRS& aTRS)
         {
             position = aTRS.translation;
-            rotation = glm::quat(aTRS.rotation);
+            rotation = glm::quat(glm::radians(aTRS.rotation));
             scale = aTRS.scale;
         }
         
@@ -45,9 +45,7 @@ namespace Goose
         {
             glm::mat4x4 result = *this;
             result *= aOther;
-            glm::vec3 skew;
-            glm::vec4 perspective;
-            glm::decompose(result, position, rotation, scale, skew, perspective);
+            Wonder::DecomposeMatrix(result,position,rotation,scale);
             return *this;
         }
         

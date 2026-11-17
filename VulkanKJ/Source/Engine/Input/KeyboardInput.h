@@ -53,6 +53,7 @@ namespace KeyboardInput
         Shift = GLFW_KEY_LEFT_SHIFT,
         Control = GLFW_KEY_LEFT_CONTROL,
         Alt = GLFW_KEY_LEFT_ALT,
+        Delete = GLFW_KEY_DELETE,
         MouseLeft = GLFW_MOUSE_BUTTON_LEFT,
         MouseRight = GLFW_MOUSE_BUTTON_RIGHT,
         MouseMiddle = GLFW_MOUSE_BUTTON_MIDDLE,

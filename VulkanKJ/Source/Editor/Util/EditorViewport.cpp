@@ -65,6 +65,8 @@ void Wonder::EditorViewport::ResizeViewport(uint32_t aWidth, uint32_t aHeight)
     SceneRenderer::CreateSceneImageInfo(mySceneImageInfo,myRenderImage,vk::Extent2D(aWidth,aHeight));
     mySceneImageInfo.resolutionId = myResolutionId;
     
+    Vulkan::TextureDescriptor::GetInstance().UpdateDescriptorSet();
+    
     myViewportSize.x = static_cast<float>(aWidth);
     myViewportSize.y = static_cast<float>(aHeight);
 }

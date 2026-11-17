@@ -8,6 +8,7 @@
 #include "DocumentBase.h"
 #include "Util/EditorViewport.h"
 #include "Util/LineGrid.h"
+#include "Util/ObjectSelection.h"
 
 namespace Wonder
 {
@@ -35,9 +36,14 @@ namespace Wonder
         
         void DisplayHierarchy();
         void DisplayHierarchyObject(PrefabObjectId aPrefabObjectId);
+        void HierarchyDropTarget(PrefabObjectId aPrefabObjectId);
         
-        void DisplayProperties();
+        void DisplayNameEdit();
+        void DisplayTRSEdit();
+        void DisplayComponents();
         void DisplayAddComponent();
+        
+        
         
         void RecreatePrefab() const;
         void PrepareRenderInfo();
@@ -52,8 +58,13 @@ namespace Wonder
         PrefabAsset myReferencePrefab;
         PrefabAsset myEditPrefab;
         
-        ECS::EntityReference mySelection{};
+        std::vector<ComponentData> myDisplayedComponents;
+        
+        ObjectSelection mySelection;
         PrefabId myId;
+        
+        bool myAnyHierarchyObjectHovered{};
+        bool myClearSelectionOnClick{};
         
         ECS::EntityID myPrefabHeadEntityId{123};
         
