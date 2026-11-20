@@ -25,6 +25,9 @@ public:
      */
     template <typename E, typename std::enable_if<EventTypeTraits<E>::IsEvent, bool>::type = true, typename... Args>
     static void Publish(Args&&... aArgs);
+    
+    template <typename E, typename std::enable_if<EventTypeTraits<E>::IsEvent, bool>::type = true, typename... Args>
+    static void PublishInstant(Args&&... aArgs);
 
     /**
      * @brief Poll all events
@@ -69,6 +72,14 @@ void PostMaster::Publish(Args&&... aArgs)
     
     E event(std::forward<Args>(aArgs)...);
     eventQueue->EnqueueEvent(event);
+}
+
+template<typename E, typename std::enable_if<EventTypeTraits<E>::IsEvent, bool>::type, typename ... Args>
+void PostMaster::PublishInstant(Args&&... aArgs)
+{
+    EventQueue<E>* eventQueue = GetInstance().GetEventQueue<E>();
+    E event(std::forward<Args>(aArgs)...);
+    eventQueue->PollEvent(event);
 }
 
 template <typename E>

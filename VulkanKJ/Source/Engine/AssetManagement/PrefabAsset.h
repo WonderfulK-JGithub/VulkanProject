@@ -20,6 +20,8 @@ namespace Wonder
         Goose::String32 name = "123";
     };
     
+    
+    
     class PrefabAsset
     {
     public:
@@ -27,6 +29,7 @@ namespace Wonder
         void SaveToJson(nlohmann::json& aJso, const char* aName);
         
         void AdoptPrefab(PrefabObjectId aParent,PrefabId aId);
+        bool ContainsPrefab(PrefabId aPrefabId) const;
     
         static PrefabAsset MakeDefault(const char* aName);
         
@@ -36,12 +39,24 @@ namespace Wonder
         std::unordered_map<PrefabObjectId,std::vector<PrefabObjectId>>& AccessParentToChildrenMap();
         const std::unordered_map<PrefabObjectId,std::vector<PrefabObjectId>>& GetParentToChildrenMap() const;
         
+        std::unordered_map<PrefabObjectId,ComponentOverrides>& AccessOverrides();
+        const std::unordered_map<PrefabObjectId,ComponentOverrides>& GetOverrides() const;
+        
+        PrefabObjectData& AccessHeadObjectData();
+        const PrefabObjectData& GetHeadObjectData() const;
+        
         PrefabObjectId GetHeadObjectId() const;
         PrefabId GetPrefabId() const;
+        
+        std::vector<ComponentData>& AccessComponents(PrefabObjectId aPrefabObjectId);
     private:
         
         Goose::MappedVector<PrefabObjectId,PrefabObjectData> myPrefabObjects;
         std::unordered_map<PrefabObjectId,std::vector<PrefabObjectId>> myParentToChildrenMap;
+        
+        std::unordered_map<PrefabObjectId,ComponentOverrides> myOverrides;
+        
+        std::vector<PrefabId> myDependencies;
         
         PrefabObjectId myHeadObjectId{};
         PrefabId myId{};

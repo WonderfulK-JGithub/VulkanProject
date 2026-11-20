@@ -128,7 +128,7 @@ void Engine::RecreateSwapchain()
 
 void Engine::MakeInstance()
 {
-	myInstance = VkInit::MakeInstance("application name");
+	myInstance = VkInit::MakeInstance("application");
 
 	myDLD = vk::detail::DispatchLoaderDynamic(myInstance, vkGetInstanceProcAddr);
 

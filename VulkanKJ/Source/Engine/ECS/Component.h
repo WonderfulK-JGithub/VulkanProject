@@ -6,10 +6,7 @@
 #include "Defines.h"
 
 
-namespace Goose
-{
-	struct SpriteShaderInstanceData;
-}
+
 
 namespace ECS
 {

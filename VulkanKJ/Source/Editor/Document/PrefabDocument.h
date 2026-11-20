@@ -12,6 +12,8 @@
 
 namespace Wonder
 {
+    struct PrefabAssetUpdateEvent;
+
     class PrefabDocument final : public DocumentBase
     {
         enum class PanelNames
@@ -29,6 +31,8 @@ namespace Wonder
         void Save() override;
 
         void CommandUpdatePrefab(const PrefabAsset& aPrefabAsset);
+        
+        void OnPrefabAssetUpdate(PrefabAssetUpdateEvent aEvent);
     private:
         void MakeUpdateCommand();
         

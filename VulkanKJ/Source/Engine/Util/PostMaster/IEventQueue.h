@@ -17,6 +17,8 @@ class EventQueue final : public IEventQueue
 {
 public:
     virtual void PollEvents() override;
+    
+    void PollEvent(const T& aEvent);
 
     void EnqueueEvent(const T& aEvent);
 
@@ -43,6 +45,18 @@ void EventQueue<T>::PollEvents()
             {
                 observer.Invoke(event);
             }
+        }
+    }
+}
+
+template<typename T>
+void EventQueue<T>::PollEvent(const T& aEvent)
+{
+    for (Action<T>& observer : myObservers)
+    {
+        if (observer != nullptr)
+        {
+            observer.Invoke(aEvent);
         }
     }
 }

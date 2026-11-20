@@ -1,5 +1,3 @@
-#include "pchGoose.h"
-
 #include "PostMaster.h"
 
 void PostMaster::PollEvents()

@@ -2,6 +2,8 @@
 #include "Util/Container/PrimitiveVector.hpp"
 
 #include <cstdint>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
 
 namespace Wonder
 {
@@ -37,4 +39,14 @@ namespace Wonder
 		const ComponentTypeBase* myType = nullptr;
 		uint64_t myAllowOverridesFlag = 0;
 	};
+	
+	using ComponentOverrides = std::unordered_map<const ComponentTypeBase*,ComponentData>;
+	
+	std::vector<ComponentData> GetOverridenComponents(const std::vector<ComponentData>& aComponents, const ComponentOverrides& aOverrides);
+	
+	void SaveComponentsToJson(std::vector<ComponentData>& aComponentDatas, nlohmann::json& aJson);
+	void LoadComponentsFromJson(std::vector<ComponentData>& aComponentDatas,const nlohmann::json& aJson);
+	
+	void SaveOverridesToJson(const ComponentOverrides& aOverrides, nlohmann::json& aJson);
+	void LoadOverridesFromJson(ComponentOverrides& aOverrides,const nlohmann::json& aJson);
 }

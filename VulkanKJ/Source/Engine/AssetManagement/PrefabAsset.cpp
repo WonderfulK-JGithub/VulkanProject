@@ -13,27 +13,6 @@ void Wonder::PrefabAsset::Init(const nlohmann::json& aJson)
     myHeadObjectId.id = aJson["myHeadObject"];
     
     const nlohmann::json& objectDataListJson = aJson["objectDataList"];
-
-    auto loadComponentDatas = [](std::vector<ComponentData>& aComponentDatas, nlohmann::json& aJson)
-    {
-        static std::string typeName;
-        for (auto& componentDataJson : aJson)
-        {
-            typeName                        = componentDataJson["!type"];
-            const ComponentTypeBase* type = GetComponentType(Tga::StringRegistry::RegisterOrGetString(typeName));
-
-            if (type == nullptr)
-            {
-                continue;
-            }
-
-            aComponentDatas.emplace_back(type);
-            Reflection::globalReflectionMode = Reflection::ReflectionMode::Load;
-            Reflection::globalJsonSaveData = &componentDataJson;
-            type->ReflectComponent(aComponentDatas.back().AccessData());
-            aComponentDatas.back().AccessOverridesFlag() = componentDataJson["allowedOverrides"];
-        }
-    };
     
     for (auto& objectDataJson : objectDataListJson)
     {
@@ -46,7 +25,7 @@ void Wonder::PrefabAsset::Init(const nlohmann::json& aJson)
         data.basePrefabId.id = objectDataJson["basePrefabId"];
         data.name = objectDataJson["name"];
         
-        loadComponentDatas(data.components, const_cast<nlohmann::json&>(objectDataJson["components"]));
+        LoadComponentsFromJson(data.components, const_cast<nlohmann::json&>(objectDataJson["components"]));
         
         myPrefabObjects.emplace(data.objectId,data);
         
@@ -61,7 +40,20 @@ void Wonder::PrefabAsset::Init(const nlohmann::json& aJson)
                 myParentToChildrenMap.emplace(data.parentId,std::vector<PrefabObjectId>{data.objectId});
             }
         }
+        
+        if (data.basePrefabId != myId && std::ranges::find(myDependencies,data.basePrefabId) == myDependencies.end())
+        {
+            myDependencies.push_back(data.basePrefabId);
+        }
+        
+        if (objectDataJson.contains("overrides"))
+        {
+            auto& overrides = myOverrides[data.objectId];
+            LoadOverridesFromJson(overrides, objectDataJson["overrides"]);
+        }
     }
+    
+    
 }
 
 void Wonder::PrefabAsset::SaveToJson(nlohmann::json& aJson,const char* aName)
@@ -70,23 +62,6 @@ void Wonder::PrefabAsset::SaveToJson(nlohmann::json& aJson,const char* aName)
     aJson[NAME_JSON_KEY] = aName == nullptr ? GetPrefabRegistry().GetNameFromID(myId) : aName;
     
     aJson["myHeadObject"] = myHeadObjectId.id;
-
-    auto saveComponentDatas = [&](std::vector<ComponentData>& aComponentDatas, nlohmann::json& aJson)
-    {
-        for (ComponentData& componentData : aComponentDatas)
-        {
-            const ComponentTypeBase* type = componentData.GetType();
-
-            nlohmann::json currentSetJson;
-            currentSetJson["!type"]            = type->GetName(); // ! in order to make it come first in the file XD
-            currentSetJson["allowedOverrides"] = componentData.GetOverridesFlag();
-
-            Reflection::globalReflectionMode = Reflection::ReflectionMode::Save;
-            Reflection::globalJsonSaveData = &currentSetJson;
-            type->ReflectComponent(componentData.AccessData());
-            aJson.emplace_back(currentSetJson);
-        }
-    };
     
     aJson["objectDataList"] = nlohmann::json::array();
     nlohmann::json& objectDataListJson = aJson["objectDataList"];
@@ -104,9 +79,15 @@ void Wonder::PrefabAsset::SaveToJson(nlohmann::json& aJson,const char* aName)
         objectDataJson["basePrefabId"] = data.basePrefabId.id;
         objectDataJson["name"] = data.name.c_str();
         
-        saveComponentDatas(data.components, objectDataJson["components"]);
+        SaveComponentsToJson(data.components, objectDataJson["components"]);
         
         objectDataListJson.emplace_back(objectDataJson);
+        
+        if (myOverrides.contains(data.objectId))
+        {
+            auto& overrides = myOverrides[data.objectId];
+            LoadOverridesFromJson(overrides, objectDataJson["overrides"]);
+        }
     }
 }
 
@@ -132,6 +113,32 @@ void Wonder::PrefabAsset::AdoptPrefab(PrefabObjectId aParent, PrefabId aId)
     {
         myParentToChildrenMap.emplace(newData.parentId,std::vector<PrefabObjectId>{newData.objectId});
     }
+
+    if (std::ranges::find(myDependencies,aId) == myDependencies.end())
+    {
+        myDependencies.push_back(aId);
+    }
+}
+
+bool Wonder::PrefabAsset::ContainsPrefab(PrefabId aPrefabId) const
+{
+    for (auto& id : myDependencies)
+    {
+        if (id == aPrefabId)
+        {
+            return true;
+        }
+    }
+    for (auto& id : myDependencies)
+    {
+        auto& prefab = GetPrefabRegistry().AccessAssetFromID(id);
+        if (prefab.ContainsPrefab(aPrefabId))
+        {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 Wonder::PrefabAsset Wonder::PrefabAsset::MakeDefault(const char* aName)
@@ -174,6 +181,26 @@ const std::unordered_map<Wonder::PrefabObjectId,std::vector<Wonder::PrefabObject
     return myParentToChildrenMap;
 }
 
+std::unordered_map<Wonder::PrefabObjectId, Wonder::ComponentOverrides>& Wonder::PrefabAsset::AccessOverrides()
+{
+    return myOverrides;
+}
+
+const std::unordered_map<Wonder::PrefabObjectId, Wonder::ComponentOverrides>& Wonder::PrefabAsset::GetOverrides() const
+{
+    return myOverrides;
+}
+
+Wonder::PrefabObjectData& Wonder::PrefabAsset::AccessHeadObjectData()
+{
+    return myPrefabObjects.at(myHeadObjectId);
+}
+
+const Wonder::PrefabObjectData& Wonder::PrefabAsset::GetHeadObjectData() const
+{
+    return myPrefabObjects.at(myHeadObjectId);
+}
+
 Wonder::PrefabObjectId Wonder::PrefabAsset::GetHeadObjectId() const
 {
     return myHeadObjectId;
@@ -182,4 +209,19 @@ Wonder::PrefabObjectId Wonder::PrefabAsset::GetHeadObjectId() const
 Wonder::PrefabId Wonder::PrefabAsset::GetPrefabId() const
 {
     return myId;
+}
+
+std::vector<Wonder::ComponentData>& Wonder::PrefabAsset::AccessComponents(PrefabObjectId aPrefabObjectId)
+{
+    auto& prefabObject = myPrefabObjects.at(aPrefabObjectId);
+    
+    if (prefabObject.basePrefabId == myId)
+    {
+        return prefabObject.components;
+    }
+    else
+    {
+        auto& prefab = GetPrefabRegistry().AccessAssetFromID(prefabObject.basePrefabId);
+        return prefab.AccessComponents(prefab.GetHeadObjectId());
+    }
 }

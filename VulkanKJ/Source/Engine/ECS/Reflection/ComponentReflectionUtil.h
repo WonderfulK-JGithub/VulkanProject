@@ -40,9 +40,12 @@ namespace Wonder::Reflection
 	inline ECS::EntityID globalCurrentReflectedId = ECS::INVALID_ENTITY;
 
 	inline uint64_t globalAllowedOverridesFlag{};
+	inline uint64_t globalAllowChangePropertyIndex{};
+	inline bool globalAllowChangePropertyValue{};
 	inline uint64_t globalOverridesEditFlag{};
 
 	inline nlohmann::json* globalJsonSaveData = nullptr;
+	inline const nlohmann::json* globalJsonLoadData = nullptr;
 
 	inline uint8_t PreEditStuff(size_t aIndex)
 	{
@@ -61,14 +64,8 @@ namespace Wonder::Reflection
 			{
 				info = InfoFlag_EditEnded | InfoFlag_ChangedValue;
 
-				if (isAllowed)
-				{
-					globalAllowedOverridesFlag |= allowFlag;
-				}
-				else
-				{
-					globalAllowedOverridesFlag &= static_cast<uint64_t>(-1) ^ (allowFlag);
-				}
+				globalAllowChangePropertyIndex = aIndex;
+				globalAllowChangePropertyValue = isAllowed;
 			}
 			if (ImGui::IsItemHovered())
 			{
@@ -108,9 +105,10 @@ namespace Wonder::Reflection
 		switch (globalReflectionMode)
 		{
 		case ReflectionMode::Load:
-			LoadProperty(aValue, *globalJsonSaveData, aName);
+			LoadProperty(aValue, *globalJsonLoadData, aName);
 			break;
-		case ReflectionMode::Save:SaveProperty(aValue, *globalJsonSaveData, aName);
+		case ReflectionMode::Save:
+			SaveProperty(aValue, *globalJsonSaveData, aName);
 			break;
 		case ReflectionMode::Display:
 		{

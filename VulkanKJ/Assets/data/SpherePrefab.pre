@@ -5,7 +5,21 @@
   "objectDataList": [
     {
       "basePrefabId": 18,
-      "components": null,
+      "components": [
+        {
+          "!type": "Model",
+          "Custom Data": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "Is Visible": false,
+          "Material": 219902325555200,
+          "Model": 219902325555203,
+          "allowedOverrides": 1
+        }
+      ],
       "name": "SpherePrefab",
       "objectId": 19,
       "parentId": 0,

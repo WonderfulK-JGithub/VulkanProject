@@ -1,0 +1,1 @@
+C:\VulkanSDK\1.4.350.0\Bin\vulkaninfo.exe --summary

@@ -28,25 +28,33 @@ namespace ECS
             
             const glm::mat4x4 childTransform = aTransform * glm::mat4x4(Goose::TransformComponent(childObjectData.localTransform));
             *ECS::Entity(childEntityId).GetTransform() = childTransform;
-            
-            for (const Wonder::ComponentData& componentData : childObjectData.components)
-            {
-                componentData.GetType()->OnGameComponentCreate(ECS::Entity(childEntityId), componentData.AccessData());
-            }
-            
+
             if (childObjectData.basePrefabId != aPrefab.GetPrefabId())
             {
                 Wonder::PrefabAsset& otherPrefab = Wonder::GetPrefabRegistry().AccessAssetFromID(childObjectData.basePrefabId);
+                const std::vector<Wonder::ComponentData>& compoents = otherPrefab.AccessPrefabObjects().at(otherPrefab.GetHeadObjectId()).components;
+                
+                for (const Wonder::ComponentData& componentData : compoents)
+                {
+                    componentData.GetType()->OnGameComponentCreate(ECS::Entity(childEntityId), componentData.AccessData());
+                }
                 
                 if (otherPrefab.GetPrefabObjects().size() > 1)
                 {
                     InstantiateChildren(otherPrefab,childEntityId,childTransform,childEntityId,childObjectId);
                 }
             }
-            
-            if (parentToChildMap.contains(childObjectId))
+            else
             {
-                InstantiateChildren(aPrefab,aHeadEntityId,childTransform,childEntityId,childObjectId);
+                for (const Wonder::ComponentData& componentData : childObjectData.components)
+                {
+                    componentData.GetType()->OnGameComponentCreate(ECS::Entity(childEntityId), componentData.AccessData());
+                }
+                
+                if (parentToChildMap.contains(childObjectId))
+                {
+                    InstantiateChildren(aPrefab,aHeadEntityId,childTransform,childEntityId,childObjectId);
+                }
             }
         }
         

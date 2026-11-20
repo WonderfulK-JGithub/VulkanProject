@@ -14,6 +14,8 @@
 #include <Input/KeyboardInput.h>
 #include <Math/Color.h>
 #include <Util/ImGuiColor.h>
+#include <Util/PostMaster/PostMaster.h>
+#include <Util/PostMaster/EventTypes.h>
 
 #include "EditorGlobals.h"
 
@@ -44,6 +46,8 @@ void Wonder::PrefabDocument::Init(const Filepath& aFilePath)
 	
 	ECS::ECSScope scope{&myEcs};
 	ECS::Instantiate(myEditPrefab,{},myPrefabHeadEntityId);
+	
+	PostMaster::Subscribe<PrefabAssetUpdateEvent>({&PrefabDocument::OnPrefabAssetUpdate,this});
 }
 
 void Wonder::PrefabDocument::Update([[maybe_unused]] float aDeltaTime)
@@ -160,6 +164,7 @@ void Wonder::PrefabDocument::Close()
     
 	myEditorViewport.Destroy();
 	SceneRenderer::DestroySceneObjectInfo(mySceneObjectInfo);
+	PostMaster::UnSubscribe<PrefabAssetUpdateEvent>({&PrefabDocument::OnPrefabAssetUpdate,this});
 }
 
 void Wonder::PrefabDocument::Save()
@@ -171,6 +176,8 @@ void Wonder::PrefabDocument::Save()
 	prefab.SaveToJson(saveJson,nullptr);
 	FileFunctions::SaveFileFromJson(GetDataPath() / GetPrefabRegistry().GetAssetFilePath(myId),saveJson);
 	
+	PostMaster::PublishInstant<PrefabAssetUpdateEvent>(PrefabAssetUpdateEvent{.prefabId = myId});
+	
 	myCommandManager.SetSaveCommandCount();
 }
 
@@ -179,6 +186,15 @@ void Wonder::PrefabDocument::CommandUpdatePrefab(const PrefabAsset& aPrefabAsset
 	myEditPrefab = aPrefabAsset;
 
 	RecreatePrefab();
+}
+
+void Wonder::PrefabDocument::OnPrefabAssetUpdate(const PrefabAssetUpdateEvent aEvent)
+{
+	if (myEditPrefab.ContainsPrefab(aEvent.prefabId))
+	{
+		ECS::ECSScope scope{&myEcs};
+		RecreatePrefab();
+	}
 }
 
 void Wonder::PrefabDocument::MakeUpdateCommand()
@@ -356,9 +372,15 @@ void Wonder::PrefabDocument::HierarchyDropTarget(PrefabObjectId aPrefabObjectId)
 			const std::string name = filePath.filename().replace_extension().string();
 			PrefabId prefabId = GetPrefabRegistry().GetIDFromName(name.c_str());
 			
+			auto& prefab = GetPrefabRegistry().AccessAssetFromID(prefabId);
+			
 			if (prefabId == myId)
 			{
 				LOG_WARNING("%s","Tried do add prefab to itself!");
+			}
+			else if (prefab.ContainsPrefab(myId))
+			{
+				LOG_WARNING("Prefab circular loop detected when adding %s to %s, adoption denied",name.c_str(),myImGuiName.GetString());
 			}
 			else
 			{
@@ -506,9 +528,59 @@ void Wonder::PrefabDocument::DisplayComponents()
 	auto& selectionList = mySelection.GetSelection();
 	auto& prefabObjects = myEditPrefab.AccessPrefabObjects();
 	
-	bool isMultiSelect = selectionList.size() > 1;
+	auto& overridesMap = myEditPrefab.AccessOverrides();
 	
-    myDisplayedComponents = prefabObjects.at(selectionList[0].prefabObjectId).components;
+	bool isMultiSelect = selectionList.size() > 1;
+	bool selectedOtherPrefab = false;
+	
+    myDisplayedComponents = myEditPrefab.AccessComponents(selectionList[0].prefabObjectId);
+	
+	for (uint32_t selectionIndex = 0; selectionIndex < selectionList.size(); ++selectionIndex)
+	{
+		auto& selectedPrefabObject = prefabObjects.at(selectionList[selectionIndex].prefabObjectId);
+
+		std::vector<ComponentData> selectedComponents = myEditPrefab.AccessComponents(selectionList[selectionIndex].prefabObjectId);
+		
+		bool isOtherPrefab = selectedPrefabObject.basePrefabId != myId;
+		if (isOtherPrefab)
+		{
+			auto it = overridesMap.find(selectionList[selectionIndex].prefabObjectId);
+			
+			if (it != overridesMap.end())
+			{
+				selectedComponents = GetOverridenComponents(selectedComponents,it->second);
+			}
+			
+			selectedOtherPrefab = true;
+		}
+		
+		for (uint32_t componentIndex = 0; componentIndex < myDisplayedComponents.size(); ++componentIndex)
+		{
+			bool componentFound = false;
+			for (auto& component : selectedComponents)
+			{
+				if (component.GetType() == myDisplayedComponents[componentIndex].GetType())
+				{
+					componentFound = true;
+					
+					if (isOtherPrefab)
+					{
+						myDisplayedComponents[componentIndex].AccessOverridesFlag() &= component.GetOverridesFlag();
+					}
+					
+					break;
+				}
+			}
+			
+			if (componentFound == false)
+			{
+				myDisplayedComponents.erase(myDisplayedComponents.begin() + selectionIndex);
+				componentIndex--;
+			}
+		}
+		
+		
+	}
 
     Reflection::globalReflectionMode = Reflection::ReflectionMode::Display;
     Reflection::globalCurrentReflectedId = isMultiSelect ? ECS::INVALID_ENTITY : ECS::GetEntityFromReference(selectionList[0]).GetID();
@@ -518,6 +590,8 @@ void Wonder::PrefabDocument::DisplayComponents()
 	const ComponentTypeBase* typeToRemove = nullptr;
 	int changedComponentIndex = -1; 
 	uint64_t changeFlag = 0;
+	uint64_t allowChangeIndex = 67;
+	bool allowChangeValue = false;
 	
     for (int componentIndex = 0; componentIndex < static_cast<int>(myDisplayedComponents.size()); ++componentIndex)
     {
@@ -544,9 +618,10 @@ void Wonder::PrefabDocument::DisplayComponents()
         if (open)
         {
             Reflection::globalInfoFlag             = 0;
+        	Reflection::globalAllowChangePropertyIndex = 0;
             Reflection::globalAllowedOverridesFlag = myDisplayedComponents[componentIndex].GetOverridesFlag();
             Reflection::globalOverridesEditFlag    = 0;
-            Reflection::globalEditType             = Reflection::EditType::Prefab;
+            Reflection::globalEditType             = selectedOtherPrefab ? Reflection::EditType::Override : Reflection::EditType::Prefab;
 
             ImGuiUtil::PropertyTable::BeginPropertyTable();
             type->ReflectComponent(data);
@@ -560,6 +635,8 @@ void Wonder::PrefabDocument::DisplayComponents()
         	{
         		changedComponentIndex = componentIndex;
         		changeFlag = Reflection::globalOverridesEditFlag;
+        		allowChangeValue = Reflection::globalAllowChangePropertyValue;
+        		allowChangeIndex = Reflection::globalAllowChangePropertyIndex;
         	}
         }
 
@@ -596,7 +673,8 @@ void Wonder::PrefabDocument::DisplayComponents()
 		const ComponentTypeBase* typeToUpdate = myDisplayedComponents[changedComponentIndex].GetType();
 		
 		Reflection::globalOverridesEditFlag = changeFlag;
-		Reflection::globalAllowedOverridesFlag |= std::numeric_limits<uint64_t>::max();
+		Reflection::globalAllowedOverridesFlag |= selectedOtherPrefab ? 
+		myDisplayedComponents[changedComponentIndex].GetOverridesFlag() : std::numeric_limits<uint64_t>::max();
 		
 		Reflection::globalReflectionMode = Reflection::ReflectionMode::OverrideMerge;
 		Reflection::globalPropertyIndex = 0u;
@@ -609,6 +687,33 @@ void Wonder::PrefabDocument::DisplayComponents()
 				
 			if (selectedPrefabObject.basePrefabId != myId)
 			{
+				auto& componentOverrides = overridesMap[selectedPrefabObject.objectId];
+				
+				if (componentOverrides.contains(typeToUpdate) == false)
+				{
+					componentOverrides.insert({typeToUpdate,ComponentData(typeToUpdate)});
+				}
+				
+				ComponentData& overrideToUpdate = componentOverrides.at(typeToUpdate);
+
+				for (auto& component : myEditPrefab.AccessComponents(selectedPrefabObject.objectId))
+				{
+					if (component.GetType() != typeToUpdate)
+					{
+						continue;
+					}
+					
+					Reflection::globalPrefabData = component.AccessData();
+					Reflection::globalDataStartAddress = overrideToUpdate.AccessData();
+					
+					typeToUpdate->ReflectComponent(overrideToUpdate.AccessData());
+					
+					typeToUpdate->SetComponentData(ECS::GetEntityFromReference(selectionList[selectionIndex]), overrideToUpdate.AccessData());
+				
+					overrideToUpdate.AccessOverridesFlag() |= changeFlag;
+					break;
+				}
+				
 				continue;
 			}
 
@@ -617,6 +722,20 @@ void Wonder::PrefabDocument::DisplayComponents()
 				if (selectedPrefabObject.components[i].GetType() == typeToUpdate)
 				{
 					ComponentData& componentToUpdate = selectedPrefabObject.components[i];
+					
+					if (selectedOtherPrefab == false && allowChangeIndex != 67)
+					{
+						const uint64_t allowFlag = 1ui64 << allowChangeIndex;
+						if (allowChangeValue)
+						{
+							componentToUpdate.AccessOverridesFlag() |= allowFlag;
+						}
+						else
+						{
+							componentToUpdate.AccessOverridesFlag() &= static_cast<uint64_t>(-1) ^ (allowFlag);
+						}
+						continue;
+					}
 					
 					Reflection::globalPrefabData = componentToUpdate.AccessData();
 					Reflection::globalDataStartAddress = componentToUpdate.AccessData();
